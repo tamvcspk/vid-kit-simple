@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background Circle -->
+    <circle cx="256" cy="256" r="240" fill="#1E1E1E"/>
+    
+    <!-- Play Button Shape -->
+    <path d="M220 180L340 256L220 332V180Z" fill="#00A1D6"/>
+    
+    <!-- Film Strip Elements -->
+    <rect x="160" y="160" width="192" height="192" stroke="#00A1D6" stroke-width="16" stroke-dasharray="8 8"/>
+    
+    <!-- GPU Accent Lines -->
+    <path d="M140 140L120 120" stroke="#00A1D6" stroke-width="8"/>
+    <path d="M372 140L392 120" stroke="#00A1D6" stroke-width="8"/>
+    <path d="M140 372L120 392" stroke="#00A1D6" stroke-width="8"/>
+    <path d="M372 372L392 392" stroke="#00A1D6" stroke-width="8"/>
+</svg>

@@ -1,0 +1,66 @@
+@import 'variables';
+
+.drop-zone {
+  border: 2px dashed var(--surface-border);
+  border-radius: $border-radius;
+  padding: $spacing-lg;
+  text-align: center;
+  margin: $spacing-xs 0;
+  background-color: var(--surface-section);
+  cursor: pointer;
+  transition:
+    border-color $transition-speed ease,
+    background-color $transition-speed ease;
+
+  &:hover {
+    border-color: var(--primary-color);
+  }
+}
+
+.tabview-custom {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .tabview-content-custom {
+    flex-grow: 1;
+    overflow: hidden;
+
+    .p-tabview-panel {
+      height: 100%;
+      overflow: hidden;
+    }
+  }
+
+  .p-tabview-nav {
+    li {
+      .p-tabview-nav-link {
+        padding: $spacing-sm $spacing-md;
+        border-radius: 0;
+        transition:
+          background-color $transition-speed,
+          color $transition-speed;
+      }
+
+      &:first-child .p-tabview-nav-link {
+        border-top-left-radius: $border-radius;
+      }
+
+      &:last-child .p-tabview-nav-link {
+        border-top-right-radius: $border-radius;
+      }
+    }
+  }
+}
+
+
+.theme-toggle {
+  &:hover {
+    color: var(--primary-color) !important;
+  }
+}
+
+.p-menu.p-menu-overlay {
+  max-height: $menu-max-height;
+  overflow-y: auto;
+}

@@ -1,0 +1,50 @@
+@import 'variables';
+@import 'layout';
+@import 'components';
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-family, $font-family);
+  font-size: $font-size-base;
+  line-height: $line-height-base;
+  font-weight: 400;
+  color: var(--text-color, $text-dark);
+  background-color: var(--surface-ground, $text-light);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+// Media queries
+@media screen and (max-width: 768px) {
+  .app-header {
+    h1 {
+      font-size: 1rem;
+    }
+    .app-logo {
+      height: 1.5rem;
+    }
+  }
+
+  .app-header,
+  .app-main,
+  .app-footer {
+    padding: $spacing-xs $spacing-sm;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .app-header {
+    h1 {
+      display: none;
+    }
+  }
+
+  .app-header,
+  .app-main,
+  .app-footer {
+    padding: $spacing-xs;
+  }
+}

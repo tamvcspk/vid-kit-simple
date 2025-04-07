@@ -1,0 +1,20 @@
+# Các thư mục được tạo ra trong quá trình build
+dist
+build
+node_modules
+.git
+.github
+.vscode
+public
+target
+third_party
+
+# Các file cụ thể không cần định dạng
+package-lock.json
+Cargo.lock
+*.lock
+*.log
+*.md
+*.json.br
+*.wasm
+*.rlib 

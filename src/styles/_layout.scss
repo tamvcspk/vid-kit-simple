@@ -1,0 +1,103 @@
+@import 'variables';
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  transition:
+    background-color $transition-speed,
+    color $transition-speed;
+  background-color: var(--surface-ground);
+  color: var(--text-color);
+
+  // Dark theme (default)
+  &.dark-theme {
+    background-color: var(--surface-ground);
+    color: var(--text-color);
+
+    .app-header,
+    .app-footer {
+      background-color: var(--surface-card);
+    }
+
+    .drop-zone {
+      border-color: var(--surface-border);
+      background-color: var(--surface-section);
+    }
+  }
+
+  // Light theme
+  &.light-theme {
+    background-color: var(--surface-ground);
+    color: var(--text-color);
+
+    .app-header,
+    .app-footer {
+      background-color: var(--surface-card);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .drop-zone {
+      border-color: var(--surface-border);
+      background-color: var(--surface-section);
+    }
+  }
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  padding: $spacing-xs $spacing-lg;
+  background-color: var(--surface-card);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-height: $header-height;
+  flex-shrink: 0;
+  position: relative;
+  transition: background-color $transition-speed;
+
+  .app-logo {
+    height: 2rem;
+    margin-right: $spacing-sm;
+  }
+
+  h1 {
+    font-size: 1.2rem;
+    margin: 0;
+    white-space: nowrap;
+    color: var(--text-color);
+  }
+
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    gap: $spacing-xs;
+  }
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: $spacing-sm $spacing-lg;
+  background-color: var(--surface-ground);
+}
+
+.app-footer {
+  padding: $spacing-xs $spacing-lg;
+  background-color: var(--surface-card);
+  display: flex;
+  justify-content: flex-end;
+  min-height: $footer-height;
+  flex-shrink: 0;
+  transition: background-color $transition-speed;
+
+  .gpu-status {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    color: var(--primary-color);
+    font-size: 0.9rem;
+  }
+}
