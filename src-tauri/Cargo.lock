@@ -523,8 +523,10 @@ checksum = "1a7964611d71df112cb1730f2ee67324fcf4d0fc6606acbbe9bfe06df124637c"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -4401,6 +4403,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "vid-kit-simple"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "gfx-backend-vulkan",
  "gfx-hal",
  "serde",
@@ -4408,6 +4411,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "tempfile",
 ]
 
 [[package]]
