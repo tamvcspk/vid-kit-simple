@@ -1,4 +1,4 @@
-mod gpu_detector;
+pub mod gpu_detector;
 use gpu_detector::check_gpu_availability;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/

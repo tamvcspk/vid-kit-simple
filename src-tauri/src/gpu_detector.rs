@@ -87,7 +87,7 @@ pub fn check_gpu_availability() -> Result<GpuList, String> {
     Ok(GpuList { gpus: gpu_list })
 }
 
-fn check_ffmpeg_codec(codec: &str) -> bool {
+pub fn check_ffmpeg_codec(codec: &str) -> bool {
     let output = Command::new("ffmpeg")
         .args(["-hide_banner", "-encoders"])
         .output();
