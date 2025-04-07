@@ -37,7 +37,7 @@ export function AppFooter() {
       icon: 'pi pi-microchip',
       command: () => setSelectedGpu(null),
     },
-    ...(gpuList?.gpus.map((gpu, index) => ({
+    ...(gpuList?.gpus.map((gpu) => ({
       label: `${gpu.name}`,
       icon: gpu.is_available ? 'pi pi-check' : 'pi pi-times',
       command: () => setSelectedGpu(gpu),
