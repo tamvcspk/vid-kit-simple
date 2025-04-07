@@ -85,19 +85,11 @@
 }
 
 .app-footer {
-  padding: $spacing-xs $spacing-lg;
+  padding: 0 $spacing-lg;
   background-color: var(--surface-card);
   display: flex;
   justify-content: flex-end;
-  min-height: $footer-height;
+  min-height: 32px;
   flex-shrink: 0;
   transition: background-color $transition-speed;
-
-  .gpu-status {
-    display: flex;
-    align-items: center;
-    gap: $spacing-xs;
-    color: var(--primary-color);
-    font-size: 0.9rem;
-  }
 }

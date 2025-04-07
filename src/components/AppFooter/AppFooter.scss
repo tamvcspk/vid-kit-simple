@@ -1,15 +1,20 @@
 .app-footer {
+  // Không định nghĩa lại padding, min-height và background-color vì đã được định nghĩa trong _layout.scss
+  
   .gpu-status {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    color: var(--text-color);
+    font-size: 0.75rem;
 
     .gpu-selector-btn {
       background: transparent;
       border: 1px solid var(--surface-border);
       color: var(--text-color);
-      padding: 0.5rem;
+      padding: 0.25rem 0.5rem;
       transition: all 0.2s ease;
+      font-size: 0.75rem;
 
       &:hover {
         background: var(--surface-hover);
@@ -21,7 +26,11 @@
       }
 
       .p-button-icon {
-        font-size: 1rem;
+        font-size: 0.875rem;
+      }
+      
+      .p-button-label {
+        font-size: 0.75rem;
       }
     }
   }
