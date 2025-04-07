@@ -40,13 +40,17 @@
         transition:
           background-color $transition-speed,
           color $transition-speed;
+
+        .p-tabview-title {
+          margin-left: 0.5rem;
+        }
       }
 
-      &:first-child .p-tabview-nav-link {
+      &.p-unselectable-text:first-child .p-tabview-nav-link {
         border-top-left-radius: $border-radius;
       }
 
-      &:last-child .p-tabview-nav-link {
+      &.p-unselectable-text:last-child .p-tabview-nav-link {
         border-top-right-radius: $border-radius;
       }
     }

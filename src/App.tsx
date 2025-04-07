@@ -5,6 +5,7 @@ import SplitView from './components/SplitView';
 import EditView from './components/EditView';
 import SanitizeView from './components/SanitizeView';
 import { AppHeader } from './components/AppHeader';
+import { AppFooter } from './components/AppFooter/AppFooter';
 import { useTheme } from './hooks/useTheme';
 
 // PrimeReact CSS
@@ -37,7 +38,7 @@ function App() {
           <TabPanel header="Convert" leftIcon="pi pi-sync">
             <ConvertView />
           </TabPanel>
-          <TabPanel header="Split" leftIcon="pi pi-scissors">
+          <TabPanel header="Split" leftIcon="pi pi-minus">
             <SplitView />
           </TabPanel>
           <TabPanel header="Edit" leftIcon="pi pi-pencil">
@@ -49,12 +50,7 @@ function App() {
         </TabView>
       </main>
 
-      <footer className="app-footer">
-        <div className="gpu-status">
-          <i className="pi pi-desktop" />
-          <span>GPU: Not Detected</span>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }

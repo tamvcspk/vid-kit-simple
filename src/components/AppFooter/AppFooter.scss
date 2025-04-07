@@ -1,0 +1,28 @@
+.app-footer {
+  .gpu-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .gpu-selector-btn {
+      background: transparent;
+      border: 1px solid var(--surface-border);
+      color: var(--text-color);
+      padding: 0.5rem;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: var(--surface-hover);
+        border-color: var(--primary-color);
+      }
+
+      &:focus {
+        box-shadow: none;
+      }
+
+      .p-button-icon {
+        font-size: 1rem;
+      }
+    }
+  }
+} 
