@@ -46,7 +46,7 @@ export function Footer() {
   ];
 
   return (
-    <FooterContainer>
+    <FooterContainer className='app-footer'>
       <GpuStatus>
         <GpuSelectorButton
           icon={selectedGpu?.is_available ? 'pi pi-desktop' : 'pi pi-microchip'}

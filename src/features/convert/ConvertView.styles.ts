@@ -1,33 +1,105 @@
 import styled from '@emotion/styled';
-import { Card } from 'primereact/card';
 
 // Main container
 export const Container = styled.div`
-  padding: 1.5rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 
   h2 {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     color: var(--primary-color);
   }
+`;
+
+// Two-column layout container
+export const TwoColumnLayout = styled.div`
+  display: flex;
+  flex: 1;
+  gap: 1.5rem;
+  overflow: hidden;
+  height: 100%;
 
   // Responsive adjustments
   @media (max-width: 768px) {
-    .p-grid {
-      display: flex;
-      flex-direction: column;
-    }
+    flex-direction: column;
+  }
+`;
 
-    .p-dialog {
-      width: 90vw !important;
-    }
+// Left column - File list panel
+export const FileListPanel = styled.div`
+  flex: 7; // 70% of the space
+  display: flex;
+  flex-direction: column;
+  background-color: var(--surface-50);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow: hidden;
+  min-width: 300px;
+
+  @media (max-width: 768px) {
+    flex: 1;
+  }
+`;
+
+// Right column - Settings panel container
+export const SettingsPanelContainer = styled.div`
+  flex: 3; // 30% of the space
+  overflow-y: auto;
+  padding-right: 0.5rem;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--surface-100);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--surface-300);
+    border-radius: 4px;
+  }
+`;
+
+// File list header container
+export const FileListHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+
+  h3 {
+    margin: 0;
+    color: var(--primary-color);
+  }
+`;
+
+// File list container with scrolling
+export const FileListContainer = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--surface-100);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--surface-300);
+    border-radius: 4px;
   }
 `;
 
 // Drop zone
 export const DropZone = styled.div<{ isDragging: boolean; hasFile: boolean }>`
-  // Extend the base drop-zone styles with specific styles for convert view
-  margin-bottom: 1rem;
-  position: relative;
+  flex: 1;
   min-height: 150px;
   display: flex;
   flex-direction: column;
@@ -39,6 +111,7 @@ export const DropZone = styled.div<{ isDragging: boolean; hasFile: boolean }>`
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
+  margin-bottom: 1rem;
 
   &:hover {
     border-color: var(--primary-color);
@@ -112,29 +185,49 @@ export const FileActions = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-// Video info card
-export const VideoInfoCard = styled(Card)`
-  margin-bottom: 1.5rem;
+// File item in the list
+export const FileItem = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  background-color: var(--surface-card);
+  border-left: 3px solid var(--primary-color);
+  transition: all 0.2s ease;
 
-  h3 {
-    margin-top: 0;
-    margin-bottom: 1rem;
-    color: var(--primary-color);
+  &:hover {
+    background-color: var(--surface-hover);
+  }
+
+  &.selected {
+    background-color: var(--primary-50);
+    border-left-color: var(--primary-600);
   }
 `;
 
-// Info item
-export const InfoItem = styled.div`
-  margin-bottom: 0.5rem;
-  display: flex;
+// File icon
+export const FileIcon = styled.i`
+  font-size: 1.25rem;
+  margin-right: 0.75rem;
+  color: var(--primary-color);
+`;
 
-  label {
-    font-weight: bold;
-    margin-right: 0.5rem;
-    min-width: 100px;
+// File details
+export const FileDetails = styled.div`
+  flex: 1;
+  overflow: hidden;
+
+  .file-name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.25rem;
   }
 
-  span {
+  .file-info {
+    font-size: 0.75rem;
     color: var(--text-color-secondary);
   }
 `;

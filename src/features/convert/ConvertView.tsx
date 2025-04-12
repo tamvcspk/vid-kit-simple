@@ -1,37 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from 'primereact/button';
-import { Dropdown } from 'primereact/dropdown';
-import { InputText } from 'primereact/inputtext';
-import { Slider } from 'primereact/slider';
-import { ProgressBar } from 'primereact/progressbar';
-import { SelectButton } from 'primereact/selectbutton';
 import { Dialog } from 'primereact/dialog';
 import { Message } from 'primereact/message';
-import { Divider } from 'primereact/divider';
+import { InputText } from 'primereact/inputtext';
+// import { v4 as uuidv4 } from 'uuid';
 
 import { useError } from '../../hooks';
 import { presetService } from '../../services';
 import { videoService } from '../../services';
-import { Preset, VideoInfo, ProcessingOptions } from '../../types';
+import { Preset, ProcessingOptions } from '../../types';
 import { formatErrorForUser, ErrorCategory } from '../../utils/errorUtils';
+import { SettingsPanel, FileListItem, FileItemData } from './components';
 
 // Import styled components
 import {
   Container,
+  TwoColumnLayout,
+  FileListPanel,
+  FileListHeader,
+  FileListContainer,
+  SettingsPanelContainer,
   DropZone,
   UploadIcon,
   UploadText,
-  FileName,
-  BatchIndicator,
   UploadingContainer,
-  FileActions,
-  VideoInfoCard,
-  InfoItem,
-  ConversionOptions,
-  AdvancedOptions,
-  ConversionActions,
-  ConversionProgress,
   SuccessMessage
 } from './ConvertView.styles';
 
@@ -43,12 +36,11 @@ declare global {
 }
 
 const ConvertView: React.FC = () => {
-  // State for video file
+  // State for files
+  const [files, setFiles] = useState<FileItemData[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [batchFiles, setBatchFiles] = useState<string[]>([]);
 
   // State for conversion options
   const [outputFormat, setOutputFormat] = useState<string>('mp4');
@@ -76,37 +68,7 @@ const ConvertView: React.FC = () => {
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Supported formats
-  const supportedFormats = [
-    { label: 'MP4', value: 'mp4' },
-    { label: 'MKV', value: 'mkv' },
-    { label: 'AVI', value: 'avi' },
-    { label: 'WebM', value: 'webm' },
-    { label: 'MOV', value: 'mov' },
-  ];
-
-  // Resolution options
-  const resolutionOptions = [
-    { label: 'Original', value: 'original' },
-    { label: '480p', value: '480p' },
-    { label: '720p', value: '720p' },
-    { label: '1080p', value: '1080p' },
-    { label: '4K', value: '4k' },
-  ];
-
-  // Framerate options
-  const fpsOptions = [
-    { label: 'Original', value: 'original' },
-    { label: '24 FPS', value: '24' },
-    { label: '30 FPS', value: '30' },
-    { label: '60 FPS', value: '60' },
-  ];
-
-  // GPU acceleration options
-  const gpuOptions = [
-    { label: 'Yes', value: true },
-    { label: 'No', value: false },
-  ];
+  // These options are now handled by the SettingsPanel component
 
   // Load preset list when component mounts
   useEffect(() => {
@@ -143,9 +105,10 @@ const ConvertView: React.FC = () => {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    setIsUploading(true);
 
-    const files = Array.from(e.dataTransfer.files);
-    const videoFiles = files.filter(
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    const videoFiles = droppedFiles.filter(
       file =>
         file.type.startsWith('video/') ||
         ['.mp4', '.mkv', '.avi', '.webm', '.mov'].some(ext => file.name.toLowerCase().endsWith(ext))
@@ -153,48 +116,124 @@ const ConvertView: React.FC = () => {
 
     if (videoFiles.length === 0) {
       setError({ message: 'Please select a valid video file', category: ErrorCategory.Validation, timestamp: new Date() });
+      setIsUploading(false);
       return;
     }
 
-    // If there are multiple files, process in batch
-    if (videoFiles.length > 1) {
-      const filePaths = videoFiles.map(file => file.path || '').filter(Boolean);
-      setBatchFiles(filePaths);
-      if (filePaths.length > 0) {
-        setSelectedFile(filePaths[0]);
-        await loadVideoInfo(filePaths[0]);
+    // Add files to the list
+    const newFiles = videoFiles.map(file => ({
+      id: crypto.randomUUID(),
+      name: file.name,
+      path: file.path || '',
+      size: file.size,
+      type: file.type || 'video/mp4',
+    }));
+
+    setFiles(prevFiles => [...prevFiles, ...newFiles]);
+
+    // Select the first file if none is selected
+    if (!selectedFile && newFiles.length > 0) {
+      const firstFile = newFiles[0];
+      setSelectedFile(firstFile.path);
+      await loadVideoInfo(firstFile.path);
+    }
+
+    setIsUploading(false);
+  };
+
+  // Add file to list
+  const addFileToList = async (filePath: string, fileName: string, fileSize: number, fileType: string) => {
+    const newFile = {
+      id: crypto.randomUUID(),
+      name: fileName,
+      path: filePath,
+      size: fileSize,
+      type: fileType || 'video/mp4',
+    };
+
+    setFiles(prevFiles => [...prevFiles, newFile]);
+    setSelectedFile(filePath);
+    await loadVideoInfo(filePath);
+  };
+
+  // Handle file selection from list
+  const handleFileSelect = (file: FileItemData) => {
+    setSelectedFile(file.path);
+    loadVideoInfo(file.path);
+  };
+
+  // Handle file input change
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    setIsUploading(true);
+    const selectedFiles = Array.from(e.target.files);
+    const videoFiles = selectedFiles.filter(
+      file =>
+        file.type.startsWith('video/') ||
+        ['.mp4', '.mkv', '.avi', '.webm', '.mov'].some(ext => file.name.toLowerCase().endsWith(ext))
+    );
+
+    if (videoFiles.length === 0) {
+      setError({ message: 'Please select a valid video file', category: ErrorCategory.Validation, timestamp: new Date() });
+      setIsUploading(false);
+      return;
+    }
+
+    // Add files to the list
+    Promise.all(
+      videoFiles.map(async (file) => {
+        await addFileToList(file.path || '', file.name, file.size, file.type);
+      })
+    ).finally(() => {
+      setIsUploading(false);
+      // Reset the input value so the same file can be selected again
+      if (e.target) e.target.value = '';
+    });
+  };
+
+  // Remove file from list
+  const handleFileRemove = (file: FileItemData) => {
+    setFiles(prevFiles => prevFiles.filter(f => f.id !== file.id));
+
+    // If the removed file was selected, clear selection or select another file
+    if (selectedFile === file.path) {
+      const remainingFiles = files.filter(f => f.id !== file.id);
+      if (remainingFiles.length > 0) {
+        handleFileSelect(remainingFiles[0]);
+      } else {
+        setSelectedFile(null);
       }
-    } else if (videoFiles[0].path) {
-      setSelectedFile(videoFiles[0].path);
-      await loadVideoInfo(videoFiles[0].path);
     }
   };
 
-  // Select video file using dialog
-  const handleBrowseClick = async () => {
-    const selectedPath = await videoService.selectVideoFile();
-    if (selectedPath) {
-      setSelectedFile(selectedPath);
-      await loadVideoInfo(selectedPath);
-    }
-  };
-
-  // Load video information
+  // Load video information and update file object
   const loadVideoInfo = async (filePath: string) => {
     setIsUploading(true);
     setError(null);
 
     try {
       const info = await videoService.getVideoInfo(filePath);
-      console.log(info);
       if (info) {
-        setVideoInfo(info);
+        // Update the file object with video info
+        const fileIndex = files.findIndex(f => f.path === filePath);
+        if (fileIndex >= 0) {
+          const updatedFiles = [...files];
+          updatedFiles[fileIndex] = {
+            ...updatedFiles[fileIndex],
+            videoInfo: info
+          };
+          setFiles(updatedFiles);
+        }
+        return info;
       } else {
         setError({ message: 'Unable to load video information', category: ErrorCategory.Validation, timestamp: new Date() });
+        return null;
       }
     } catch (err) {
       console.error('Error loading video information:', err);
       setError({ message: 'Error loading video information', category: ErrorCategory.Task, timestamp: new Date() });
+      return null;
     } finally {
       setIsUploading(false);
     }
@@ -358,53 +397,7 @@ const ConvertView: React.FC = () => {
     }
   };
 
-  // Display video information
-  const renderVideoInfo = () => {
-    if (!videoInfo) return null;
-
-    return (
-      <VideoInfoCard>
-        <h3>Video Information</h3>
-        <div className="p-grid">
-          <div className="p-col-6">
-            <InfoItem>
-              <label>Format:</label>
-              <span>{videoInfo.format}</span>
-            </InfoItem>
-            <InfoItem>
-              <label>Resolution:</label>
-              <span>
-                {videoInfo.width} x {videoInfo.height}
-              </span>
-            </InfoItem>
-            <InfoItem>
-              <label>Duration:</label>
-              <span>
-                {Math.floor(videoInfo.duration / 60)}:
-                {Math.floor(videoInfo.duration % 60)
-                  .toString()
-                  .padStart(2, '0')}
-              </span>
-            </InfoItem>
-          </div>
-          <div className="p-col-6">
-            <InfoItem>
-              <label>Codec:</label>
-              <span>{videoInfo.codec}</span>
-            </InfoItem>
-            <InfoItem>
-              <label>Bitrate:</label>
-              <span>{Math.round(videoInfo.bitrate / 1000)} Kbps</span>
-            </InfoItem>
-            <InfoItem>
-              <label>Framerate:</label>
-              <span>{videoInfo.framerate} FPS</span>
-            </InfoItem>
-          </div>
-        </div>
-      </VideoInfoCard>
-    );
-  };
+  // This function is no longer needed as we're using the VideoInfoCard component directly
 
   // Save preset dialog
   const renderSavePresetDialog = () => {
@@ -451,214 +444,116 @@ const ConvertView: React.FC = () => {
         </div>
       </Dialog>
     );
-  };
+  };console.log(selectedFile)
 
   return (
     <Container>
       <h2>Convert Video</h2>
 
-      {/* Drag and drop area */}
-      <DropZone
-        ref={dropZoneRef}
-        isDragging={isDragging}
-        hasFile={!!selectedFile}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        {isUploading ? (
-          <UploadingContainer>
-            <UploadIcon className="pi pi-spin pi-spinner"></UploadIcon>
-            <UploadText>Loading file...</UploadText>
-          </UploadingContainer>
-        ) : selectedFile ? (
-          <>
-            <UploadIcon className="pi pi-video"></UploadIcon>
-            <FileName>{selectedFile.split('/').pop()?.split('\\').pop()}</FileName>
-            {batchFiles.length > 1 && (
-              <BatchIndicator>+{batchFiles.length - 1} other files</BatchIndicator>
-            )}
-          </>
-        ) : (
-          <>
-            <UploadIcon className="pi pi-cloud-upload"></UploadIcon>
-            <UploadText>Drag and drop video files here or click to select</UploadText>
-          </>
-        )}
-      </DropZone>
+      <TwoColumnLayout>
+        {/* Left column - File list */}
+        <FileListPanel
+          ref={dropZoneRef}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <FileListHeader>
+            <h3>Video Files</h3>
+            <Button
+              label="Add Files"
+              icon="pi pi-plus"
+              className="p-button-sm"
+              onClick={() => fileInputRef.current?.click()}
+            />
+          </FileListHeader>
 
-      <input
-        type="file"
-        ref={fileInputRef}
-        style={{ display: 'none' }}
-        accept="video/*"
-        onChange={e => {
-          const file = e.target.files?.[0];
-          if (file && file.path) {
-            setSelectedFile(file.path);
-            loadVideoInfo(file.path);
-          }
-        }}
-      />
-
-      <FileActions>
-        <Button label="Select File" icon="pi pi-folder-open" onClick={handleBrowseClick} />
-        {selectedFile && (
-          <Button
-            label="Delete"
-            icon="pi pi-trash"
-            className="p-button-danger"
-            onClick={() => {
-              setSelectedFile(null);
-              setVideoInfo(null);
-              setBatchFiles([]);
-            }}
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept="video/*"
+            onChange={handleFileInputChange}
+            multiple
           />
-        )}
-      </FileActions>
 
-      {error && (
-        <Message
-          severity="error"
-          text={formatErrorForUser(error)}
-          style={{ width: '100%', marginBottom: '1rem' }}
-        />
-      )}
-
-      {/* Display video information */}
-      {videoInfo && renderVideoInfo()}
-
-      {/* Conversion options form */}
-      {selectedFile && (
-        <ConversionOptions>
-          <h3>Conversion Options</h3>
-
-          <div className="p-grid">
-            <div className="p-col-12 p-md-6">
-              <div className="p-field">
-                <label htmlFor="preset">Preset</label>
-                <div className="p-inputgroup">
-                  <Dropdown
-                    id="preset"
-                    value={selectedPreset}
-                    options={availablePresets.map(p => ({ label: p.name, value: p.name }))}
-                    onChange={e => {
-                      setSelectedPreset(e.value);
-                      applyPreset(e.value);
-                    }}
-                    placeholder="Select preset"
-                    className="w-full"
-                  />
-                  <Button
-                    icon="pi pi-save"
-                    tooltip="Save new preset"
-                    onClick={() => setShowSavePresetDialog(true)}
-                  />
-                </div>
-              </div>
-
-              <div className="p-field">
-                <label htmlFor="outputFormat">Output Format</label>
-                <Dropdown
-                  id="outputFormat"
-                  value={outputFormat}
-                  options={supportedFormats}
-                  onChange={e => setOutputFormat(e.value)}
-                  placeholder="Select format"
-                  className="w-full"
+          {/* File list or drop zone */}
+          {files.length > 0 ? (
+            <FileListContainer>
+              {files.map(file => (
+                <FileListItem
+                  key={file.id}
+                  file={file}
+                  isSelected={selectedFile === file.path}
+                  onSelect={handleFileSelect}
+                  onRemove={handleFileRemove}
                 />
-              </div>
+              ))}
+            </FileListContainer>
+          ) : (
+            <DropZone
+              isDragging={isDragging}
+              hasFile={false}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {isUploading ? (
+                <UploadingContainer>
+                  <UploadIcon className="pi pi-spin pi-spinner"></UploadIcon>
+                  <UploadText>Loading file...</UploadText>
+                </UploadingContainer>
+              ) : (
+                <>
+                  <UploadIcon className="pi pi-cloud-upload"></UploadIcon>
+                  <UploadText>Drag and drop video files here or click to select</UploadText>
+                </>
+              )}
+            </DropZone>
+          )}
+        </FileListPanel>
 
-              <div className="p-field">
-                <label htmlFor="resolution">Resolution</label>
-                <Dropdown
-                  id="resolution"
-                  value={resolution}
-                  options={resolutionOptions}
-                  onChange={e => setResolution(e.value)}
-                  placeholder="Select resolution"
-                  className="w-full"
-                />
-              </div>
-            </div>
-
-            <div className="p-col-12 p-md-6">
-              <div className="p-field">
-                <label htmlFor="bitrate">Bitrate: {bitrate} Kbps</label>
-                <Slider
-                  id="bitrate"
-                  value={bitrate}
-                  onChange={e => setBitrate(e.value as number)}
-                  min={500}
-                  max={20000}
-                  step={500}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="p-field">
-                <label htmlFor="fps">Framerate</label>
-                <Dropdown
-                  id="fps"
-                  value={fps}
-                  options={fpsOptions}
-                  onChange={e => setFps(e.value)}
-                  placeholder="Select framerate"
-                  className="w-full"
-                />
-              </div>
-
-              <div className="p-field">
-                <label htmlFor="use_gpu">Use GPU</label>
-                <SelectButton
-                  id="use_gpu"
-                  value={use_gpu}
-                  options={gpuOptions}
-                  onChange={e => setUseGpu(e.value)}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="p-field">
-            <Button
-              label={showAdvanced ? 'Hide advanced options' : 'Show advanced options'}
-              icon={`pi ${showAdvanced ? 'pi-chevron-up' : 'pi-chevron-down'}`}
-              className="p-button-text"
-              onClick={() => setShowAdvanced(!showAdvanced)}
+        {/* Right column - Settings panel */}
+        <SettingsPanelContainer>
+          {/* Error message */}
+          {error && (
+            <Message
+              severity="error"
+              text={formatErrorForUser(error)}
+              style={{ width: '100%', marginBottom: '1rem' }}
             />
-          </div>
-
-          {showAdvanced && (
-            <AdvancedOptions>
-              <div className="p-field">
-                <label>Advanced options will appear here</label>
-              </div>
-            </AdvancedOptions>
           )}
 
-          <Divider />
-
-          <ConversionActions>
-            <Button
-              label="Start Conversion"
-              icon="pi pi-play"
-              className="p-button-success"
-              onClick={startConversion}
-              disabled={isConverting || !selectedFile}
+          {/* Conversion options form */}
+          {selectedFile && (
+            <SettingsPanel
+              presets={availablePresets}
+              selectedPreset={selectedPreset}
+              outputFormat={outputFormat}
+              outputPath={outputPath || ''}
+              resolution={resolution}
+              bitrate={bitrate}
+              framerate={parseInt(fps) || 30}
+              use_gpu={use_gpu}
+              isConverting={isConverting}
+              conversionProgress={progress}
+              showAdvanced={showAdvanced}
+              onPresetChange={(presetName) => {
+                setSelectedPreset(presetName);
+                applyPreset(presetName);
+              }}
+              onOutputFormatChange={(format) => setOutputFormat(format)}
+              onOutputPathChange={(path) => setOutputPath(path)}
+              onResolutionChange={(res) => setResolution(res)}
+              onBitrateChange={(rate) => setBitrate(rate)}
+              onFramerateChange={(rate) => setFps(rate.toString())}
+              onUseGpuChange={(useGpu) => setUseGpu(useGpu)}
+              onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
+              onSavePreset={() => setShowSavePresetDialog(true)}
+              onStartConversion={startConversion}
+              onBrowseOutput={() => console.log('Browse output path')}
             />
-          </ConversionActions>
-
-          {isConverting && (
-            <ConversionProgress>
-              <h4>Converting... {progress}%</h4>
-              <ProgressBar value={progress} showValue={false} />
-            </ConversionProgress>
           )}
-        </ConversionOptions>
-      )}
+        </SettingsPanelContainer>
+      </TwoColumnLayout>
 
       {/* Save preset dialog */}
       {renderSavePresetDialog()}
