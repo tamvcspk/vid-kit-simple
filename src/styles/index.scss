@@ -1,6 +1,6 @@
-@import 'variables';
-@import 'layout';
-@import 'components';
+@use 'variables' as *;
+@forward 'layout';
+@forward 'components';
 
 html,
 body {

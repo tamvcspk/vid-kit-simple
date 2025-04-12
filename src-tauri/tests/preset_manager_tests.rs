@@ -8,9 +8,9 @@ fn setup_test_dir() -> tempfile::TempDir {
 fn test_preset_manager_init() {
     let temp_dir = setup_test_dir();
     let preset_dir = temp_dir.path().join("presets");
-    
+
     PresetManager::new(&preset_dir).expect("Failed to create PresetManager");
-    
+
     // Kiểm tra xem thư mục presets có được tạo không
     assert!(preset_dir.exists(), "Presets directory should be created");
 }
@@ -19,9 +19,9 @@ fn test_preset_manager_init() {
 fn test_save_and_get_preset() {
     let temp_dir = setup_test_dir();
     let preset_dir = temp_dir.path().join("presets");
-    
+
     let preset_manager = PresetManager::new(&preset_dir).expect("Failed to create PresetManager");
-    
+
     // Tạo một preset mẫu
     let test_preset = ConversionPreset {
         id: "test_preset".to_string(),
@@ -37,16 +37,20 @@ fn test_save_and_get_preset() {
         created_at: "2023-05-15T10:00:00Z".to_string(),
         updated_at: "2023-05-15T10:00:00Z".to_string(),
     };
-    
+
     // Lưu preset
-    preset_manager.save_preset(&test_preset).expect("Failed to save preset");
-    
+    preset_manager
+        .save_preset(&test_preset)
+        .expect("Failed to save preset");
+
     // Kiểm tra file có tồn tại không
     let preset_path = preset_dir.join("test_preset.json");
     assert!(preset_path.exists(), "Preset file should exist");
-    
+
     // Lấy preset và kiểm tra
-    let loaded_preset = preset_manager.get_preset("test_preset").expect("Failed to get preset");
+    let loaded_preset = preset_manager
+        .get_preset("test_preset")
+        .expect("Failed to get preset");
     assert_eq!(loaded_preset.id, test_preset.id);
     assert_eq!(loaded_preset.name, test_preset.name);
     assert_eq!(loaded_preset.output_format, test_preset.output_format);
@@ -56,9 +60,9 @@ fn test_save_and_get_preset() {
 fn test_list_presets() {
     let temp_dir = setup_test_dir();
     let preset_dir = temp_dir.path().join("presets");
-    
+
     let preset_manager = PresetManager::new(&preset_dir).expect("Failed to create PresetManager");
-    
+
     // Tạo một số preset mẫu
     let presets = vec![
         ConversionPreset {
@@ -90,16 +94,20 @@ fn test_list_presets() {
             updated_at: "2023-05-15T10:00:00Z".to_string(),
         },
     ];
-    
+
     // Lưu các preset
     for preset in &presets {
-        preset_manager.save_preset(preset).expect("Failed to save preset");
+        preset_manager
+            .save_preset(preset)
+            .expect("Failed to save preset");
     }
-    
+
     // Lấy danh sách và kiểm tra
-    let loaded_presets = preset_manager.list_presets().expect("Failed to list presets");
+    let loaded_presets = preset_manager
+        .list_presets()
+        .expect("Failed to list presets");
     assert_eq!(loaded_presets.len(), 2, "Should have 2 presets");
-    
+
     // Kiểm tra xem các id có tồn tại trong danh sách không
     let preset_ids: Vec<String> = loaded_presets.iter().map(|p| p.id.clone()).collect();
     assert!(preset_ids.contains(&"preset1".to_string()));
@@ -110,9 +118,9 @@ fn test_list_presets() {
 fn test_delete_preset() {
     let temp_dir = setup_test_dir();
     let preset_dir = temp_dir.path().join("presets");
-    
+
     let preset_manager = PresetManager::new(&preset_dir).expect("Failed to create PresetManager");
-    
+
     // Tạo một preset mẫu
     let test_preset = ConversionPreset {
         id: "to_delete".to_string(),
@@ -128,45 +136,66 @@ fn test_delete_preset() {
         created_at: "2023-05-15T10:00:00Z".to_string(),
         updated_at: "2023-05-15T10:00:00Z".to_string(),
     };
-    
+
     // Lưu preset
-    preset_manager.save_preset(&test_preset).expect("Failed to save preset");
-    
+    preset_manager
+        .save_preset(&test_preset)
+        .expect("Failed to save preset");
+
     // Kiểm tra file có tồn tại không
     let preset_path = preset_dir.join("to_delete.json");
-    assert!(preset_path.exists(), "Preset file should exist before deletion");
-    
+    assert!(
+        preset_path.exists(),
+        "Preset file should exist before deletion"
+    );
+
     // Xóa preset
-    preset_manager.delete_preset("to_delete").expect("Failed to delete preset");
-    
+    preset_manager
+        .delete_preset("to_delete")
+        .expect("Failed to delete preset");
+
     // Kiểm tra file đã bị xóa chưa
-    assert!(!preset_path.exists(), "Preset file should not exist after deletion");
+    assert!(
+        !preset_path.exists(),
+        "Preset file should not exist after deletion"
+    );
 }
 
 #[test]
 fn test_create_default_presets() {
     let temp_dir = setup_test_dir();
     let preset_dir = temp_dir.path().join("presets");
-    
+
     let preset_manager = PresetManager::new(&preset_dir).expect("Failed to create PresetManager");
-    
+
     // Tạo các preset mặc định
-    preset_manager.create_default_presets().expect("Failed to create default presets");
-    
+    preset_manager
+        .create_default_presets()
+        .expect("Failed to create default presets");
+
     // Lấy danh sách và kiểm tra
-    let loaded_presets = preset_manager.list_presets().expect("Failed to list presets");
+    let loaded_presets = preset_manager
+        .list_presets()
+        .expect("Failed to list presets");
     assert!(!loaded_presets.is_empty(), "Should have default presets");
-    
+
     // Kiểm tra xem có các preset mặc định không
     let preset_ids: Vec<String> = loaded_presets.iter().map(|p| p.id.clone()).collect();
     assert!(preset_ids.contains(&"default_mp4".to_string()));
     assert!(preset_ids.contains(&"high_quality".to_string()));
     assert!(preset_ids.contains(&"web_optimized".to_string()));
-    
+
     // Gọi lại create_default_presets không nên tạo thêm presets
-    preset_manager.create_default_presets().expect("Failed to call create_default_presets again");
-    
-    let loaded_presets_after = preset_manager.list_presets().expect("Failed to list presets after second call");
-    assert_eq!(loaded_presets.len(), loaded_presets_after.len(), 
-               "Should not create more presets if they already exist");
-} 
+    preset_manager
+        .create_default_presets()
+        .expect("Failed to call create_default_presets again");
+
+    let loaded_presets_after = preset_manager
+        .list_presets()
+        .expect("Failed to list presets after second call");
+    assert_eq!(
+        loaded_presets.len(),
+        loaded_presets_after.len(),
+        "Should not create more presets if they already exist"
+    );
+}

@@ -11,4 +11,4 @@ const SplitView: React.FC = () => {
   );
 };
 
-export default SplitView;
+export { SplitView };

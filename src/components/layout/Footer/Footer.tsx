@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Menu } from 'primereact/menu';
-import { Button } from 'primereact/button';
-import './AppFooter.scss';
+
+// Import styled components
+import { FooterContainer, GpuStatus, GpuSelectorButton } from './Footer.styles';
 
 interface GpuInfo {
   name: string;
@@ -15,7 +16,7 @@ interface GpuList {
   gpus: GpuInfo[];
 }
 
-export function AppFooter() {
+export function Footer() {
   const [gpuList, setGpuList] = useState<GpuList | null>(null);
   const [selectedGpu, setSelectedGpu] = useState<GpuInfo | null>(null);
   const menuRef = useRef<Menu>(null);
@@ -45,10 +46,9 @@ export function AppFooter() {
   ];
 
   return (
-    <footer className="app-footer">
-      <div className="gpu-status">
-        <Button
-          className="gpu-selector-btn"
+    <FooterContainer>
+      <GpuStatus>
+        <GpuSelectorButton
           icon={selectedGpu?.is_available ? 'pi pi-desktop' : 'pi pi-microchip'}
           severity={selectedGpu?.is_available ? 'success' : 'info'}
           onClick={e => menuRef.current?.toggle(e)}
@@ -58,7 +58,7 @@ export function AppFooter() {
           tooltipOptions={{ position: 'top' }}
         />
         <Menu ref={menuRef} model={menuItems} popup />
-      </div>
-    </footer>
+      </GpuStatus>
+    </FooterContainer>
   );
 }

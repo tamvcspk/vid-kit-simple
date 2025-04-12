@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::io::{self, ErrorKind};
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Runtime};
 
 /// Defines a preset for video conversion with configurable parameters
@@ -42,12 +42,12 @@ impl PresetManager {
     /// Creates a new instance of PresetManager
     pub fn new<P: AsRef<Path>>(presets_dir: P) -> io::Result<Self> {
         let presets_dir = presets_dir.as_ref().to_path_buf();
-        
+
         // Tạo thư mục nếu không tồn tại
         if !presets_dir.exists() {
             fs::create_dir_all(&presets_dir)?;
         }
-        
+
         Ok(Self { presets_dir })
     }
 
@@ -77,15 +77,15 @@ impl PresetManager {
     /// Lists all available presets
     pub fn list_presets(&self) -> io::Result<Vec<ConversionPreset>> {
         let mut presets = Vec::new();
-        
+
         if !self.presets_dir.exists() {
             return Ok(presets);
         }
-        
+
         for entry in fs::read_dir(&self.presets_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
                 if let Ok(content) = fs::read_to_string(&path) {
                     if let Ok(preset) = serde_json::from_str::<ConversionPreset>(&content) {
@@ -94,14 +94,14 @@ impl PresetManager {
                 }
             }
         }
-        
+
         Ok(presets)
     }
 
     /// Deletes a preset by ID
     pub fn delete_preset(&self, id: &str) -> io::Result<()> {
         let file_path = self.get_preset_path(id);
-        
+
         if file_path.exists() {
             fs::remove_file(file_path)?;
             Ok(())
@@ -113,11 +113,11 @@ impl PresetManager {
     /// Creates default presets if none exist
     pub fn create_default_presets(&self) -> io::Result<()> {
         let presets = self.list_presets()?;
-        
+
         if !presets.is_empty() {
             return Ok(());
         }
-        
+
         let default_presets = vec![
             ConversionPreset {
                 id: "default_mp4".to_string(),
@@ -138,7 +138,10 @@ impl PresetManager {
                 name: "High Quality".to_string(),
                 description: Some("High quality conversion with H.264".to_string()),
                 output_format: "mp4".to_string(),
-                resolution: Resolution::Preset { width: 1920, height: 1080 },
+                resolution: Resolution::Preset {
+                    width: 1920,
+                    height: 1080,
+                },
                 bitrate: Some(12000),
                 fps: Some(60),
                 codec: Some("libx264".to_string()),
@@ -152,7 +155,10 @@ impl PresetManager {
                 name: "Web Optimized".to_string(),
                 description: Some("Optimized for web streaming".to_string()),
                 output_format: "mp4".to_string(),
-                resolution: Resolution::Preset { width: 1280, height: 720 },
+                resolution: Resolution::Preset {
+                    width: 1280,
+                    height: 720,
+                },
                 bitrate: Some(5000),
                 fps: Some(30),
                 codec: Some("libx264".to_string()),
@@ -162,11 +168,11 @@ impl PresetManager {
                 updated_at: chrono::Utc::now().to_rfc3339(),
             },
         ];
-        
+
         for preset in default_presets {
             self.save_preset(&preset)?;
         }
-        
+
         Ok(())
     }
 
@@ -179,46 +185,64 @@ impl PresetManager {
 // Tạo các hàm Tauri command
 
 #[tauri::command]
-pub async fn list_presets<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Vec<ConversionPreset>, String> {
+pub async fn list_presets<R: Runtime>(
+    app_handle: tauri::AppHandle<R>,
+) -> Result<Vec<ConversionPreset>, String> {
     let preset_manager = PresetManager::from_app_handle(&app_handle)
         .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-    
-    preset_manager.list_presets()
+
+    preset_manager
+        .list_presets()
         .map_err(|e| format!("Failed to list presets: {}", e))
 }
 
 #[tauri::command]
-pub async fn get_preset<R: Runtime>(id: String, app_handle: tauri::AppHandle<R>) -> Result<ConversionPreset, String> {
+pub async fn get_preset<R: Runtime>(
+    id: String,
+    app_handle: tauri::AppHandle<R>,
+) -> Result<ConversionPreset, String> {
     let preset_manager = PresetManager::from_app_handle(&app_handle)
         .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-    
-    preset_manager.get_preset(&id)
+
+    preset_manager
+        .get_preset(&id)
         .map_err(|e| format!("Failed to get preset: {}", e))
 }
 
 #[tauri::command]
-pub async fn save_preset<R: Runtime>(preset: ConversionPreset, app_handle: tauri::AppHandle<R>) -> Result<(), String> {
+pub async fn save_preset<R: Runtime>(
+    preset: ConversionPreset,
+    app_handle: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let preset_manager = PresetManager::from_app_handle(&app_handle)
         .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-    
-    preset_manager.save_preset(&preset)
+
+    preset_manager
+        .save_preset(&preset)
         .map_err(|e| format!("Failed to save preset: {}", e))
 }
 
 #[tauri::command]
-pub async fn delete_preset<R: Runtime>(id: String, app_handle: tauri::AppHandle<R>) -> Result<(), String> {
+pub async fn delete_preset<R: Runtime>(
+    id: String,
+    app_handle: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let preset_manager = PresetManager::from_app_handle(&app_handle)
         .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-    
-    preset_manager.delete_preset(&id)
+
+    preset_manager
+        .delete_preset(&id)
         .map_err(|e| format!("Failed to delete preset: {}", e))
 }
 
 #[tauri::command]
-pub async fn create_default_presets<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String> {
+pub async fn create_default_presets<R: Runtime>(
+    app_handle: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let preset_manager = PresetManager::from_app_handle(&app_handle)
         .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-    
-    preset_manager.create_default_presets()
+
+    preset_manager
+        .create_default_presets()
         .map_err(|e| format!("Failed to create default presets: {}", e))
-} 
+}

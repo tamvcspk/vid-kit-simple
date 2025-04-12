@@ -1,9 +1,9 @@
 import React from 'react';
 
-const SanitizeView: React.FC = () => {
+const EditView: React.FC = () => {
   return (
-    <div className="sanitize-view">
-      <h2>Sanitize Video</h2>
+    <div className="edit-view">
+      <h2>Edit Video</h2>
       <div className="drop-zone">
         <p>Drag & Drop Video Here</p>
       </div>
@@ -11,4 +11,4 @@ const SanitizeView: React.FC = () => {
   );
 };
 
-export default SanitizeView;
+export { EditView };

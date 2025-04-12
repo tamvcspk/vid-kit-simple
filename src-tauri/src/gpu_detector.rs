@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use gfx_hal::Instance;
 use gfx_backend_vulkan as back;
+use gfx_hal::Instance;
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -24,7 +24,7 @@ pub fn check_gpu_availability() -> Result<GpuList, String> {
 
     // Lấy danh sách adapter
     let adapters = instance.enumerate_adapters();
-    
+
     if adapters.is_empty() {
         return Ok(GpuList {
             gpus: vec![GpuInfo {
@@ -62,17 +62,17 @@ pub fn check_gpu_availability() -> Result<GpuList, String> {
                 if check_ffmpeg_codec("scale_cuda") {
                     supported_codecs.push("scale_cuda".to_string());
                 }
-            },
+            }
             "Intel" => {
                 if check_ffmpeg_codec("h264_qsv") {
                     supported_codecs.push("h264_qsv".to_string());
                 }
-            },
+            }
             "AMD" => {
                 if check_ffmpeg_codec("h264_amf") {
                     supported_codecs.push("h264_amf".to_string());
                 }
-            },
+            }
             _ => {}
         }
 
@@ -102,4 +102,4 @@ pub fn check_ffmpeg_codec(codec: &str) -> bool {
         }
         Err(_) => false,
     }
-} 
+}

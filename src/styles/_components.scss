@@ -1,5 +1,6 @@
-@import 'variables';
+@use 'variables' as *;
 
+/* Base drop-zone component used across the application */
 .drop-zone {
   border: 2px dashed var(--surface-border);
   border-radius: $border-radius;
@@ -14,6 +15,18 @@
 
   &:hover {
     border-color: var(--primary-color);
+  }
+
+  /* Common elements that might be used in drop zones */
+  .upload-icon {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: $spacing-xs;
+  }
+
+  .upload-text {
+    color: var(--text-color-secondary);
+    margin-bottom: $spacing-xs;
   }
 }
 

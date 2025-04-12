@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { TabView, TabPanel } from 'primereact/tabview';
-import ConvertView from './components/ConvertView';
-import SplitView from './components/SplitView';
-import EditView from './components/EditView';
-import SanitizeView from './components/SanitizeView';
-import { AppHeader } from './components/AppHeader';
-import { AppFooter } from './components/AppFooter/AppFooter';
 import { useTheme } from './hooks/useTheme';
 
 // PrimeReact CSS
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
 import './App.scss';
+import { Header } from './components/layout/Header';
+import { ConvertView } from './features/convert';
+import { SplitView } from './features/split';
+import { EditView } from './features/edit';
+import { SanitizeView } from './features/sanitize';
+import { Footer } from './components/layout/Footer';
 
 function App() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -19,7 +19,7 @@ function App() {
 
   return (
     <div className="app-container">
-      <AppHeader 
+      <Header
         isDark={isDark}
         onToggleDarkMode={toggleDarkMode}
         onChangeThemeType={changeThemeType}
@@ -50,7 +50,7 @@ function App() {
         </TabView>
       </main>
 
-      <AppFooter />
+      <Footer />
     </div>
   );
 }

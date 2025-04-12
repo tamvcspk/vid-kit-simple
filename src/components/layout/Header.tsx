@@ -2,16 +2,16 @@ import { useRef } from 'react';
 import { Button } from 'primereact/button';
 import { Menu } from 'primereact/menu';
 import { MenuItem } from 'primereact/menuitem';
-import vidkitLogo from '../assets/vidkit-logo.svg';
-import { THEME_TYPES, ThemeType } from '../constants/theme';
+import vidkitLogo from '../../assets/vidkit-logo.svg';
+import { THEME_TYPES, ThemeType } from '../../constants/theme';
 
-interface AppHeaderProps {
+interface HeaderProps {
   isDark: boolean;
   onToggleDarkMode: () => void;
   onChangeThemeType: (type: ThemeType) => void;
 }
 
-export const AppHeader = ({ isDark, onToggleDarkMode, onChangeThemeType }: AppHeaderProps) => {
+export const Header = ({ isDark, onToggleDarkMode, onChangeThemeType }: HeaderProps) => {
   const themeMenuRef = useRef<Menu>(null);
 
   const themeMenuItems: MenuItem[] = Object.keys(THEME_TYPES).map(theme => ({
@@ -47,4 +47,4 @@ export const AppHeader = ({ isDark, onToggleDarkMode, onChangeThemeType }: AppHe
       </div>
     </header>
   );
-}; 
+};
