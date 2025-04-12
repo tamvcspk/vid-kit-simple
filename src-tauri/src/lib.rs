@@ -6,7 +6,7 @@ use gpu_detector::check_gpu_availability;
 use preset_manager::{
     create_default_presets, delete_preset, get_preset, list_presets, save_preset,
 };
-use video_processor::{ProcessingOptions, ProcessingStatus, VideoProcessor};
+use video_processor::{ProcessingOptions, VideoProcessor};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
