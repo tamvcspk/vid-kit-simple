@@ -1,8 +1,10 @@
 use std::fs;
-use std::path::Path;
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -47,33 +49,60 @@ pub struct ProcessingTask {
 }
 
 pub struct VideoProcessor {
+    ffmpeg_path: PathBuf,
     tasks: Vec<ProcessingTask>,
     progress_channel: Option<(Sender<(String, f32)>, Receiver<(String, f32)>)>,
 }
 
 impl VideoProcessor {
     pub fn new() -> Self {
+        // FFmpeg được giả định nằm trong đường dẫn hệ thống
+        // hoặc trong thư mục của ứng dụng
+        let ffmpeg_path = PathBuf::from("ffmpeg");
+
         VideoProcessor {
+            ffmpeg_path,
             tasks: Vec::new(),
             progress_channel: None,
         }
     }
 
+    /// Thiết lập đường dẫn tùy chỉnh cho FFmpeg
+    pub fn with_ffmpeg_path<P: AsRef<Path>>(mut self, path: P) -> Self {
+        self.ffmpeg_path = PathBuf::from(path.as_ref());
+        self
+    }
+
     /// Lấy thông tin về tệp video
     pub fn get_video_info(&self, file_path: &str) -> Result<VideoInfo, String> {
-        // Kiểm tra đường dẫn rỗng
-        if file_path.trim().is_empty() {
-            return Err("Vui lòng cung cấp đường dẫn tệp video hợp lệ".to_string());
+        let output = Command::new(&self.ffmpeg_path)
+            .args([
+                "-i",
+                file_path,
+                "-hide_banner",
+                "-v",
+                "error",
+                "-show_format",
+                "-show_streams",
+                "-of",
+                "json",
+            ])
+            .output()
+            .map_err(|e| format!("Không thể chạy FFmpeg: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "Lỗi FFmpeg: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
 
-        // Kiểm tra xem tệp có tồn tại không
-        if !Path::new(file_path).exists() {
-            return Err(format!("Tệp không tồn tại: {}", file_path));
-        }
+        // Phân tích dữ liệu JSON từ FFmpeg
+        // Đây là một ví dụ đơn giản, trong thực tế sẽ phức tạp hơn
+        let json_output = String::from_utf8_lossy(&output.stdout);
 
-        // Sử dụng FFmpeg API đã được liên kết tĩnh
-        // Đây là một ví dụ đơn giản, trong thực tế sẽ sử dụng API FFmpeg
-        // Hiện tại chúng ta chỉ trả về thông tin giả định
+        // Giả định phân tích JSON (trong thực tế sẽ dùng serde_json)
+        // Đây chỉ là mã giả để minh họa
         Ok(VideoInfo {
             path: file_path.to_string(),
             format: "mp4".to_string(), // Giả định
@@ -164,20 +193,11 @@ impl VideoProcessor {
         args.push(task.options.output_path.clone());
 
         // Spawn một luồng để chạy FFmpeg
+        let ffmpeg_path = self.ffmpeg_path.clone();
         let task_id_clone = task_id.to_string();
 
         thread::spawn(move || {
-            // Sử dụng FFmpeg API đã được liên kết tĩnh thay vì gọi chương trình bên ngoài
-            // Đây là một ví dụ giả định
-
-            // Giả lập thành công
-            let _ = tx.send((task_id_clone.clone(), 100.0)); // Hoàn thành
-            return;
-
-            // Mã bên dưới được giữ lại như tham khảo cho việc triển khai sau này
-            /*
-            // Sử dụng Command để gọi FFmpeg như một chương trình bên ngoài
-            let mut child = match Command::new("ffmpeg")
+            let mut child = match Command::new(&ffmpeg_path)
                 .args(&args)
                 .stderr(Stdio::piped())
                 .spawn()
@@ -213,7 +233,6 @@ impl VideoProcessor {
                     let _ = tx.send((task_id_clone, -1.0)); // Lỗi
                 }
             }
-            */
         });
 
         Ok(())

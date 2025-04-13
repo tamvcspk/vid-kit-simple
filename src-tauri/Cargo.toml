@@ -16,7 +16,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-bindgen = "0.69.1"
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -28,6 +27,7 @@ gfx-backend-vulkan = "0.9"
 chrono = { version = "0.4", features = ["serde"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+ffmpeg-next = { version = "7.1.0", features = ["static"] }
 
 [dev-dependencies]
 tempfile = "3.8.1"

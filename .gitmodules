@@ -1,6 +1,0 @@
-[submodule "third_party/ffmpeg"]
-	path = third_party/ffmpeg
-	url = https://github.com/FFmpeg/FFmpeg.git
-[submodule "third_party/nv-codec-headers"]
-	path = third_party/nv-codec-headers
-	url = https://git.videolan.org/git/ffmpeg/nv-codec-headers.git

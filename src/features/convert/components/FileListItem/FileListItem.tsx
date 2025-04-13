@@ -119,13 +119,6 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   }, [file.path]);
 
   const loadVideoInfo = async () => {
-    // Check if file path is valid
-    if (!file.path || file.path.trim() === '') {
-      console.error('Invalid file path');
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     try {
       const info = await videoService.getVideoInfo(file.path);

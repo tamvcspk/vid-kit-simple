@@ -66,6 +66,7 @@ const ConvertView: React.FC = () => {
 
   // Refs
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // These options are now handled by the SettingsPanel component
 
@@ -128,20 +129,11 @@ const ConvertView: React.FC = () => {
       type: file.type || 'video/mp4',
     }));
 
-    // Filter out files with empty paths
-    const validFiles = newFiles.filter(file => file.path.trim() !== '');
-
-    if (validFiles.length === 0) {
-      setError({ message: 'Cannot access file path. Please use the file browser to select files.', category: ErrorCategory.Validation, timestamp: new Date() });
-      setIsUploading(false);
-      return;
-    }
-
-    setFiles(prevFiles => [...prevFiles, ...validFiles]);
+    setFiles(prevFiles => [...prevFiles, ...newFiles]);
 
     // Select the first file if none is selected
-    if (!selectedFile && validFiles.length > 0) {
-      const firstFile = validFiles[0];
+    if (!selectedFile && newFiles.length > 0) {
+      const firstFile = newFiles[0];
       setSelectedFile(firstFile.path);
       await loadVideoInfo(firstFile.path);
     }
@@ -151,12 +143,6 @@ const ConvertView: React.FC = () => {
 
   // Add file to list
   const addFileToList = async (filePath: string, fileName: string, fileSize: number, fileType: string) => {
-    // Check if file path is valid
-    if (!filePath || filePath.trim() === '') {
-      setError({ message: 'Cannot access file path. Please use the file browser to select files.', category: ErrorCategory.Validation, timestamp: new Date() });
-      return;
-    }
-
     const newFile = {
       id: crypto.randomUUID(),
       name: fileName,
@@ -172,37 +158,38 @@ const ConvertView: React.FC = () => {
 
   // Handle file selection from list
   const handleFileSelect = (file: FileItemData) => {
-    console.log(file)
     setSelectedFile(file.path);
     loadVideoInfo(file.path);
   };
 
-  // Handle file selection using native dialog
-  const handleAddFiles = async () => {
+  // Handle file input change
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
     setIsUploading(true);
-    setError(null);
+    const selectedFiles = Array.from(e.target.files);
+    const videoFiles = selectedFiles.filter(
+      file =>
+        file.type.startsWith('video/') ||
+        ['.mp4', '.mkv', '.avi', '.webm', '.mov'].some(ext => file.name.toLowerCase().endsWith(ext))
+    );
 
-    try {
-      // Use the native dialog from videoService
-      const filePath = await videoService.selectVideoFile();
-
-      if (!filePath) {
-        // User canceled
-        setIsUploading(false);
-        return;
-      }
-
-      // Get file name from path
-      const fileName = filePath.split(/[\\/]/).pop() || 'video';
-
-      // Add file to list (size and type will be determined later)
-      await addFileToList(filePath, fileName, 0, 'video/mp4');
-    } catch (error) {
-      console.error('Error selecting file:', error);
-      setError({ message: 'Error selecting file', category: ErrorCategory.IO, timestamp: new Date() });
-    } finally {
+    if (videoFiles.length === 0) {
+      setError({ message: 'Please select a valid video file', category: ErrorCategory.Validation, timestamp: new Date() });
       setIsUploading(false);
+      return;
     }
+
+    // Add files to the list
+    Promise.all(
+      videoFiles.map(async (file) => {
+        await addFileToList(file.path || '', file.name, file.size, file.type);
+      })
+    ).finally(() => {
+      setIsUploading(false);
+      // Reset the input value so the same file can be selected again
+      if (e.target) e.target.value = '';
+    });
   };
 
   // Remove file from list
@@ -222,12 +209,6 @@ const ConvertView: React.FC = () => {
 
   // Load video information and update file object
   const loadVideoInfo = async (filePath: string) => {
-    // Check if file path is valid
-    if (!filePath || filePath.trim() === '') {
-      setError({ message: 'Invalid file path. Please select a valid video file.', category: ErrorCategory.Validation, timestamp: new Date() });
-      return null;
-    }
-
     setIsUploading(true);
     setError(null);
 
@@ -463,7 +444,7 @@ const ConvertView: React.FC = () => {
         </div>
       </Dialog>
     );
-  };
+  };console.log(selectedFile)
 
   return (
     <Container>
@@ -483,11 +464,18 @@ const ConvertView: React.FC = () => {
               label="Add Files"
               icon="pi pi-plus"
               className="p-button-sm"
-              onClick={handleAddFiles}
+              onClick={() => fileInputRef.current?.click()}
             />
           </FileListHeader>
 
-          {/* Không cần input file nữa vì chúng ta sử dụng hộp thoại native */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept="video/*"
+            onChange={handleFileInputChange}
+            multiple
+          />
 
           {/* File list or drop zone */}
           {files.length > 0 ? (
@@ -506,7 +494,7 @@ const ConvertView: React.FC = () => {
             <DropZone
               isDragging={isDragging}
               hasFile={false}
-              onClick={handleAddFiles}
+              onClick={() => fileInputRef.current?.click()}
             >
               {isUploading ? (
                 <UploadingContainer>
