@@ -1,0 +1,48 @@
+# Cấu hình cho build script
+[ffmpeg]
+# Danh sách các DLL cần sao chép
+# Các phiên bản có thể khác nhau tùy theo cách cài đặt FFmpeg
+# Build script sẽ tìm các phiên bản tương tự nếu không tìm thấy phiên bản chính xác
+dlls = [
+  # FFmpeg 7.1.0 (phiên bản mới)
+    "avcodec-61.dll",
+    "avformat-61.dll",
+    "avutil-59.dll",
+    "swresample-5.dll",
+    "swscale-8.dll",
+    "avfilter-10.dll",
+    "avdevice-61.dll",
+
+    # FFmpeg 6.0 
+    "avcodec-60.dll",
+    "avformat-60.dll",
+    "avutil-58.dll",
+    "swresample-4.dll",
+    "swscale-7.dll",
+    "avfilter-9.dll",
+    "avdevice-60.dll",
+
+    # FFmpeg 5.0 (phiên bản cũ hơn)
+    "avcodec-59.dll",
+    "avformat-59.dll",
+    "avutil-57.dll",
+    "swresample-4.dll",
+    "swscale-6.dll",
+    "avfilter-8.dll",
+    "avdevice-59.dll",
+
+    # FFmpeg 4.0 (phiên bản cũ hơn nữa)
+    "avcodec-58.dll",
+    "avformat-58.dll",
+    "avutil-56.dll",
+    "swresample-3.dll",
+    "swscale-5.dll",
+    "avfilter-7.dll",
+    "avdevice-58.dll",
+
+    # Các DLL phụ thuộc khác
+    "zlib1.dll",
+    "libmp3lame.dll",
+    "libx264.dll",
+    "libx265.dll"
+]

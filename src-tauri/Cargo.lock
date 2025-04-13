@@ -4675,6 +4675,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-opener",
  "tempfile",
+ "toml",
 ]
 
 [[package]]

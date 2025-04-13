@@ -66,7 +66,6 @@ const ConvertView: React.FC = () => {
 
   // Refs
   const dropZoneRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // These options are now handled by the SettingsPanel component
 
@@ -162,35 +161,38 @@ const ConvertView: React.FC = () => {
     loadVideoInfo(file.path);
   };
 
-  // Handle file input change
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
+  // Handle file selection using native dialog
+  const handleSelectFile = async () => {
+    try {
+      setIsUploading(true);
+      setError(null);
 
-    setIsUploading(true);
-    const selectedFiles = Array.from(e.target.files);
-    const videoFiles = selectedFiles.filter(
-      file =>
-        file.type.startsWith('video/') ||
-        ['.mp4', '.mkv', '.avi', '.webm', '.mov'].some(ext => file.name.toLowerCase().endsWith(ext))
-    );
+      // Use videoService to open native file dialog
+      const filePath = await videoService.selectVideoFile();
 
-    if (videoFiles.length === 0) {
-      setError({ message: 'Please select a valid video file', category: ErrorCategory.Validation, timestamp: new Date() });
+      if (!filePath) {
+        // User canceled
+        setIsUploading(false);
+        return;
+      }
+
+      // Extract file name from path
+      const fileName = filePath.split(/[\\\/]/).pop() || 'video';
+
+      // Add file to the list
+      // Note: We don't have size and type information from native dialog
+      // so we'll use placeholder values
+      await addFileToList(filePath, fileName, 0, 'video/mp4');
+
       setIsUploading(false);
-      return;
+    } catch (error) {
+      console.error('Error selecting file:', error);
+      setError({ message: 'Error selecting file', category: ErrorCategory.IO, timestamp: new Date() });
+      setIsUploading(false);
     }
-
-    // Add files to the list
-    Promise.all(
-      videoFiles.map(async (file) => {
-        await addFileToList(file.path || '', file.name, file.size, file.type);
-      })
-    ).finally(() => {
-      setIsUploading(false);
-      // Reset the input value so the same file can be selected again
-      if (e.target) e.target.value = '';
-    });
   };
+
+
 
   // Remove file from list
   const handleFileRemove = (file: FileItemData) => {
@@ -244,7 +246,7 @@ const ConvertView: React.FC = () => {
     try {
       const presetOptions = await presetService.getPresetOptions(presetName);
       if (presetOptions) {
-        setOutputFormat(presetOptions.outputFormat || 'mp4');
+        setOutputFormat(presetOptions.output_format || 'mp4');
 
         if (presetOptions.resolution) {
           // Convert from [width, height] to string option
@@ -280,8 +282,8 @@ const ConvertView: React.FC = () => {
     try {
       // Create options object from current settings
       const options: ProcessingOptions = {
-        outputFormat: outputFormat,
-        outputPath: '', // Will be generated automatically when converting
+        output_format: outputFormat,
+        output_path: '', // Will be generated automatically when converting
         use_gpu: use_gpu,
       };
 
@@ -338,10 +340,20 @@ const ConvertView: React.FC = () => {
     try {
       // Prepare conversion options
       const options: ProcessingOptions = {
-        outputFormat: outputFormat,
-        outputPath: '', // Will be generated automatically
+        output_format: outputFormat,
+        output_path: outputPath,
         use_gpu: use_gpu,
       };
+
+      // Ensure output path is set
+      if (!outputPath) {
+        setError({ message: 'Please select an output directory', category: ErrorCategory.Validation, timestamp: new Date() });
+        setIsConverting(false);
+        return;
+      }
+
+      // Add file extension to the output path
+      options.output_path = `${outputPath}.${outputFormat}`;
 
       // Set resolution
       if (resolution !== 'original') {
@@ -376,7 +388,7 @@ const ConvertView: React.FC = () => {
                 clearInterval(interval);
                 setIsConverting(false);
                 setShowSuccessDialog(true);
-                setOutputPath(options.outputPath);
+                setOutputPath(options.output_path);
                 return 100;
               }
               return prev + 5;
@@ -444,7 +456,7 @@ const ConvertView: React.FC = () => {
         </div>
       </Dialog>
     );
-  };console.log(selectedFile)
+  };
 
   return (
     <Container>
@@ -464,18 +476,9 @@ const ConvertView: React.FC = () => {
               label="Add Files"
               icon="pi pi-plus"
               className="p-button-sm"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleSelectFile}
             />
           </FileListHeader>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            accept="video/*"
-            onChange={handleFileInputChange}
-            multiple
-          />
 
           {/* File list or drop zone */}
           {files.length > 0 ? (
@@ -494,7 +497,7 @@ const ConvertView: React.FC = () => {
             <DropZone
               isDragging={isDragging}
               hasFile={false}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleSelectFile}
             >
               {isUploading ? (
                 <UploadingContainer>
@@ -549,7 +552,33 @@ const ConvertView: React.FC = () => {
               onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
               onSavePreset={() => setShowSavePresetDialog(true)}
               onStartConversion={startConversion}
-              onBrowseOutput={() => console.log('Browse output path')}
+              onBrowseOutput={async () => {
+                try {
+                  // Chọn thư mục đầu ra
+                  const selectedDir = await videoService.selectDirectory();
+                  if (selectedDir) {
+                    // Tạo tên file mặc định dựa trên tên file đầu vào
+                    let defaultFileName = 'output_converted';
+
+                    // Nếu đã chọn file đầu vào, sử dụng tên của nó làm cơ sở
+                    if (selectedFile) {
+                      const fileName = selectedFile.split(/[\\\/]/).pop() || '';
+                      const fileNameWithoutExt = fileName.split('.')[0];
+                      if (fileNameWithoutExt) {
+                        defaultFileName = `${fileNameWithoutExt}_converted`;
+                      }
+                    }
+
+                    // Tạo đường dẫn đầy đủ với tên file mặc định
+                    // Không bao gồm phần mở rộng, vì nó sẽ được thêm vào sau
+                    const fullPath = `${selectedDir}/${defaultFileName}`;
+                    setOutputPath(fullPath);
+                  }
+                } catch (error) {
+                  console.error('Error selecting output directory:', error);
+                  setError({ message: 'Error selecting output directory', category: ErrorCategory.IO, timestamp: new Date() });
+                }
+              }}
             />
           )}
         </SettingsPanelContainer>

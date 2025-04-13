@@ -10,8 +10,8 @@ export interface VideoInfo {
 }
 
 export interface ProcessingOptions {
-  outputFormat: string;
-  outputPath: string;
+  output_format: string;
+  output_path: string;
   resolution?: [number, number];
   bitrate?: number;
   framerate?: number;

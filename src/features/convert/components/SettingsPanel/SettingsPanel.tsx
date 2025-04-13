@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Dropdown } from 'primereact/dropdown';
 import { InputText } from 'primereact/inputtext';
 import { Slider } from 'primereact/slider';
 import { SelectButton } from 'primereact/selectbutton';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
-import { Preset, ProcessingOptions } from '../../../../types';
+import { Preset } from '../../../../types';
 import { Container, AdvancedOptions, ActionsContainer, ProgressContainer } from './SettingsPanel.styles';
 
 interface SettingsPanelProps {
@@ -129,21 +129,47 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       </div>
 
       <div className="p-field">
-        <label htmlFor="outputPath">Output Path</label>
-        <div className="p-inputgroup">
-          <InputText
-            id="outputPath"
-            value={outputPath}
-            onChange={e => onOutputPathChange(e.target.value)}
-            placeholder="Output file path"
-            className="w-full"
-            disabled={isConverting}
-          />
-          <Button
-            icon="pi pi-folder-open"
-            onClick={onBrowseOutput}
-            disabled={isConverting}
-          />
+        <label htmlFor="outputPath">Output Location</label>
+        <div className="p-grid p-nogutter">
+          {/* Directory selection */}
+          <div className="p-col-12 p-mb-2">
+            <div className="p-inputgroup">
+              <span className="p-inputgroup-addon">Directory:</span>
+              <InputText
+                id="outputDirectory"
+                value={outputPath.substring(0, outputPath.lastIndexOf('/') + 1) || outputPath}
+                placeholder="Select output directory"
+                className="w-full"
+                disabled={true}
+              />
+              <Button
+                icon="pi pi-folder-open"
+                onClick={onBrowseOutput}
+                disabled={isConverting}
+                tooltip="Select output directory"
+                tooltipOptions={{ position: 'top' }}
+              />
+            </div>
+          </div>
+
+          {/* Filename editing */}
+          <div className="p-col-12">
+            <div className="p-inputgroup">
+              <span className="p-inputgroup-addon">Filename:</span>
+              <InputText
+                id="outputFilename"
+                value={outputPath.substring(outputPath.lastIndexOf('/') + 1) || ''}
+                onChange={e => {
+                  const dirPath = outputPath.substring(0, outputPath.lastIndexOf('/') + 1) || outputPath;
+                  onOutputPathChange(dirPath + e.target.value);
+                }}
+                placeholder="Enter filename (will be auto-generated if empty)"
+                className="w-full"
+                disabled={isConverting || !outputPath.includes('/')}
+              />
+              <span className="p-inputgroup-addon">.{outputFormat}</span>
+            </div>
+          </div>
         </div>
       </div>
 

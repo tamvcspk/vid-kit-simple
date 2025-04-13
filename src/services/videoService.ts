@@ -34,6 +34,28 @@ class VideoService extends BaseService {
   }
 
   /**
+   * Open dialog to select a directory
+   */
+  async selectDirectory(): Promise<string | null> {
+    return this.withErrorHandling(
+      async () => {
+        const selectedPath = await open({
+          directory: true,
+          multiple: false
+        });
+
+        if (selectedPath === null) {
+          return null; // User canceled
+        }
+
+        return selectedPath as string;
+      },
+      'Failed to open directory selection dialog',
+      ErrorCategory.IO
+    );
+  }
+
+  /**
    * Get video file information from backend
    */
   async getVideoInfo(filePath: string): Promise<VideoInfo | null> {
@@ -95,11 +117,9 @@ class VideoService extends BaseService {
   ): Promise<string | null> {
     return this.withErrorHandling(
       async () => {
-        // If no output path is provided, create a default one
-        if (!options.outputPath) {
-          const generatedPath = await this.generateOutputPath(inputFilePath, options.outputFormat);
-          if (!generatedPath) throw new Error('Failed to generate output path');
-          options.outputPath = generatedPath;
+        // Ensure output path is provided
+        if (!options.output_path) {
+          throw new Error('Output path is required');
         }
 
         return await invoke<string>('create_processing_task', {

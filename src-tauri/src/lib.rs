@@ -2,11 +2,26 @@ pub mod gpu_detector;
 pub mod preset_manager;
 pub mod video_processor;
 
+use std::sync::Mutex;
+use tauri::State;
+
 use gpu_detector::check_gpu_availability;
 use preset_manager::{
     create_default_presets, delete_preset, get_preset, list_presets, save_preset,
 };
-use video_processor::{ProcessingOptions, ProcessingStatus, VideoProcessor};
+use video_processor::{ProcessingOptions, VideoProcessor};
+
+// Định nghĩa state để lưu trữ VideoProcessor
+struct AppState {
+    video_processor: Mutex<VideoProcessor>,
+}
+
+// Khởi tạo state
+fn init_app_state() -> AppState {
+    AppState {
+        video_processor: Mutex::new(VideoProcessor::new()),
+    }
+}
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -21,21 +36,20 @@ fn get_video_info(path: String) -> Result<video_processor::VideoInfo, String> {
 }
 
 #[tauri::command]
-fn create_processing_task(
+fn create_processing_task<'a>(
     input_file: String,
     options: ProcessingOptions,
+    state: State<'a, AppState>,
 ) -> Result<String, String> {
-    // Trong thực tế, cần lưu trữ VideoProcessor trong state
-    // Đây chỉ là ví dụ đơn giản
-    let mut processor = VideoProcessor::new();
+    // Lấy VideoProcessor từ state
+    let mut processor = state.video_processor.lock().unwrap();
     Ok(processor.create_task(&input_file, options))
 }
 
 #[tauri::command]
-fn run_processing_task(task_id: String) -> Result<(), String> {
-    // Trong thực tế, cần lưu trữ VideoProcessor trong state
-    let mut processor = VideoProcessor::new();
-    // Giả sử đã có task trong state
+fn run_processing_task<'a>(task_id: String, state: State<'a, AppState>) -> Result<(), String> {
+    // Lấy VideoProcessor từ state
+    let mut processor = state.video_processor.lock().unwrap();
     processor.run_task(&task_id)
 }
 
@@ -45,6 +59,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        // Thêm state vào ứng dụng
+        .manage(init_app_state())
         .invoke_handler(tauri::generate_handler![
             greet,
             check_gpu_availability,

@@ -1,0 +1,16 @@
+[env]
+# Đường dẫn đến thư mục chứa các DLL của FFmpeg
+# Thay đổi đường dẫn này theo môi trường của bạn
+
+# Nếu bạn sử dụng vcpkg
+FFMPEG_DLL_PATH = "C:/vcpkg/installed/x64-windows/bin"
+
+# Nếu bạn cài đặt FFmpeg trực tiếp
+# FFMPEG_DLL_PATH = "C:/Program Files/FFmpeg/bin"
+
+# Nếu bạn sử dụng FFmpeg từ Scoop
+# FFMPEG_DLL_PATH = "C:/Users/YourUsername/scoop/apps/ffmpeg/current/bin"
+
+# Nếu bạn sử dụng FFmpeg từ Chocolatey
+# FFMPEG_DLL_PATH = "C:/ProgramData/chocolatey/lib/ffmpeg/tools/ffmpeg/bin"
+
