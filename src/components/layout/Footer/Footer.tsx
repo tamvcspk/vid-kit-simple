@@ -1,47 +1,45 @@
-import { useEffect, useState, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useRef } from 'react';
 import { Menu } from 'primereact/menu';
+import { invoke } from '@tauri-apps/api/core';
 
 // Import styled components
 import { FooterContainer, GpuStatus, GpuSelectorButton } from './Footer.styles';
 
-interface GpuInfo {
-  name: string;
-  vendor: string;
-  is_available: boolean;
-  supported_codecs: string[];
-}
+// Import debug component
+import { StateDebugger } from '../../debug/StateDebugger';
 
-interface GpuList {
-  gpus: GpuInfo[];
-}
+// Import hooks and types
+import { useAppState } from '../../../hooks/useAppState';
+import { GpuInfo } from '../../../types/state.types';
 
 export function Footer() {
-  const [gpuList, setGpuList] = useState<GpuList | null>(null);
-  const [selectedGpu, setSelectedGpu] = useState<GpuInfo | null>(null);
+  const { appState } = useAppState();
   const menuRef = useRef<Menu>(null);
 
-  useEffect(() => {
-    // Kiểm tra GPU khi component được mount
-    invoke<GpuList>('check_gpu_availability')
-      .then(info => {
-        setGpuList(info);
-      })
-      .catch(error => {
-        console.error('Failed to check GPU:', error);
-      });
-  }, []);
+  // Lấy GPU được chọn từ global state
+  const selectedGpuIndex = appState?.selected_gpu_index ?? -1;
+  const selectedGpu = selectedGpuIndex >= 0 && appState?.gpus ?
+    appState.gpus[selectedGpuIndex] : null;
+
+  // Hàm để cập nhật GPU được chọn
+  const updateSelectedGpu = async (index: number) => {
+    try {
+      await invoke('set_selected_gpu', { gpuIndex: index });
+    } catch (error) {
+      console.error('Failed to set selected GPU:', error);
+    }
+  };
 
   const menuItems = [
     {
       label: 'CPU Only',
       icon: 'pi pi-microchip',
-      command: () => setSelectedGpu(null),
+      command: () => updateSelectedGpu(-1),
     },
-    ...(gpuList?.gpus.map((gpu) => ({
+    ...(appState?.gpus?.map((gpu: GpuInfo, index: number) => ({
       label: `${gpu.name}`,
       icon: gpu.is_available ? 'pi pi-check' : 'pi pi-times',
-      command: () => setSelectedGpu(gpu),
+      command: () => updateSelectedGpu(index),
     })) || []),
   ];
 
@@ -59,6 +57,9 @@ export function Footer() {
         />
         <Menu ref={menuRef} model={menuItems} popup />
       </GpuStatus>
+
+      {/* Debug component */}
+      <StateDebugger />
     </FooterContainer>
   );
 }

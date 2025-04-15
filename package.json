@@ -24,7 +24,8 @@
     "primereact": "^10.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "sharp": "^0.34.0"
+    "sharp": "^0.34.0",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

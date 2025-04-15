@@ -398,6 +398,8 @@ impl VideoProcessor {
                         // Cập nhật tiến độ
                         if total_frames > 0 {
                             let progress = (frame_count as f32 / total_frames as f32) * 100.0;
+
+                            // Gửi tiến độ qua channel
                             let _ = tx.send((task_id_clone.clone(), progress));
                         }
                     }

@@ -7,6 +7,9 @@ import { InputText } from 'primereact/inputtext';
 // import { v4 as uuidv4 } from 'uuid';
 
 import { useError } from '../../hooks';
+import { usePreferences } from '../../hooks/usePreferences';
+import { useConversionState } from '../../hooks/useConversionState';
+import { useAppState } from '../../hooks/useAppState';
 import { presetService } from '../../services';
 import { videoService } from '../../services';
 import { Preset, ProcessingOptions } from '../../types';
@@ -36,11 +39,18 @@ declare global {
 }
 
 const ConvertView: React.FC = () => {
-  // State for files
-  const [files, setFiles] = useState<FileItemData[]>([]);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  // Get global state
+  const { appState } = useAppState();
+  const { conversionState, addTask, markTaskFailed } = useConversionState();
+  const { preferences, updatePreferences } = usePreferences();
+
+  // State for drag and drop
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+
+  // Lấy danh sách file và file được chọn từ global state
+  const files = conversionState?.files || [];
+  const selectedFile = conversionState?.selected_file_id || null;
 
   // State for conversion options
   const [outputFormat, setOutputFormat] = useState<string>('mp4');
@@ -57,7 +67,6 @@ const ConvertView: React.FC = () => {
 
   // State for conversion process
   const [isConverting, setIsConverting] = useState<boolean>(false);
-  const [progress, setProgress] = useState<number>(0);
   const [showSuccessDialog, setShowSuccessDialog] = useState<boolean>(false);
   const [outputPath, setOutputPath] = useState<string>('');
 
@@ -69,7 +78,7 @@ const ConvertView: React.FC = () => {
 
   // These options are now handled by the SettingsPanel component
 
-  // Load preset list when component mounts
+  // Load preset list and initialize settings from preferences when component mounts
   useEffect(() => {
     const loadPresets = async () => {
       try {
@@ -88,7 +97,21 @@ const ConvertView: React.FC = () => {
     };
 
     loadPresets();
-  }, []);
+
+    // Initialize settings from preferences if available
+    if (preferences) {
+      setOutputFormat(preferences.default_format || 'mp4');
+      setUseGpu(preferences.use_gpu);
+    }
+
+    // Check GPU availability from appState
+    if (appState) {
+      // Only enable GPU if it's available
+      if (!appState.gpu_available) {
+        setUseGpu(false);
+      }
+    }
+  }, [preferences, appState]);
 
   // Handle drag and drop
   const handleDragOver = (e: React.DragEvent) => {
@@ -119,22 +142,24 @@ const ConvertView: React.FC = () => {
       return;
     }
 
-    // Add files to the list
-    const newFiles = videoFiles.map(file => ({
-      id: crypto.randomUUID(),
-      name: file.name,
-      path: file.path || '',
-      size: file.size,
-      type: file.type || 'video/mp4',
-    }));
+    // Add each file to global state
+    for (const file of videoFiles) {
+      const id = crypto.randomUUID();
+      await invoke('add_file_to_list', {
+        id,
+        name: file.name,
+        path: file.path || '',
+        size: file.size,
+        fileType: file.type || 'video/mp4',
+        duration: null,
+        resolution: null,
+        thumbnail: null
+      });
 
-    setFiles(prevFiles => [...prevFiles, ...newFiles]);
-
-    // Select the first file if none is selected
-    if (!selectedFile && newFiles.length > 0) {
-      const firstFile = newFiles[0];
-      setSelectedFile(firstFile.path);
-      await loadVideoInfo(firstFile.path);
+      // Load video info for the first file
+      if (videoFiles[0] === file) {
+        await loadVideoInfo(file.path || '');
+      }
     }
 
     setIsUploading(false);
@@ -142,23 +167,28 @@ const ConvertView: React.FC = () => {
 
   // Add file to list
   const addFileToList = async (filePath: string, fileName: string, fileSize: number, fileType: string) => {
-    const newFile = {
-      id: crypto.randomUUID(),
+    const id = crypto.randomUUID();
+
+    // Thêm file vào global state
+    await invoke('add_file_to_list', {
+      id,
       name: fileName,
       path: filePath,
       size: fileSize,
-      type: fileType || 'video/mp4',
-    };
+      fileType: fileType || 'video/mp4',
+      duration: null,
+      resolution: null,
+      thumbnail: null
+    });
 
-    setFiles(prevFiles => [...prevFiles, newFile]);
-    setSelectedFile(filePath);
+    // Load thông tin video
     await loadVideoInfo(filePath);
   };
 
   // Handle file selection from list
-  const handleFileSelect = (file: FileItemData) => {
-    setSelectedFile(file.path);
-    loadVideoInfo(file.path);
+  const handleFileSelect = async (file: FileItemData) => {
+    await invoke('select_file', { fileId: file.id });
+    await loadVideoInfo(file.path);
   };
 
   // Handle file selection using native dialog
@@ -192,21 +222,13 @@ const ConvertView: React.FC = () => {
     }
   };
 
-
-
   // Remove file from list
-  const handleFileRemove = (file: FileItemData) => {
-    setFiles(prevFiles => prevFiles.filter(f => f.id !== file.id));
+  const handleFileRemove = async (file: FileItemData) => {
+    // Xóa file khỏi global state
+    await invoke('remove_file_from_list', { fileId: file.id });
 
-    // If the removed file was selected, clear selection or select another file
-    if (selectedFile === file.path) {
-      const remainingFiles = files.filter(f => f.id !== file.id);
-      if (remainingFiles.length > 0) {
-        handleFileSelect(remainingFiles[0]);
-      } else {
-        setSelectedFile(null);
-      }
-    }
+    // Nếu file bị xóa là file đang được chọn, global state sẽ tự động chọn file khác
+    // hoặc đặt selected_file_id = null nếu không còn file nào
   };
 
   // Load video information and update file object
@@ -217,16 +239,9 @@ const ConvertView: React.FC = () => {
     try {
       const info = await videoService.getVideoInfo(filePath);
       if (info) {
-        // Update the file object with video info
-        const fileIndex = files.findIndex(f => f.path === filePath);
-        if (fileIndex >= 0) {
-          const updatedFiles = [...files];
-          updatedFiles[fileIndex] = {
-            ...updatedFiles[fileIndex],
-            videoInfo: info
-          };
-          setFiles(updatedFiles);
-        }
+        // Thông tin video đã được load, nhưng chúng ta không cập nhật file object
+        // vì chúng ta đang sử dụng global state
+        // Có thể cập nhật thông tin video vào global state nếu cần
         return info;
       } else {
         setError({ message: 'Unable to load video information', category: ErrorCategory.Validation, timestamp: new Date() });
@@ -246,7 +261,8 @@ const ConvertView: React.FC = () => {
     try {
       const presetOptions = await presetService.getPresetOptions(presetName);
       if (presetOptions) {
-        setOutputFormat(presetOptions.output_format || 'mp4');
+        const newFormat = presetOptions.output_format || 'mp4';
+        setOutputFormat(newFormat);
 
         if (presetOptions.resolution) {
           // Convert from [width, height] to string option
@@ -265,7 +281,17 @@ const ConvertView: React.FC = () => {
           setFps('original');
         }
 
-        setUseGpu(presetOptions.use_gpu);
+        const newUseGpu = presetOptions.use_gpu;
+        setUseGpu(newUseGpu);
+
+        // Save format and GPU settings to preferences
+        if (preferences) {
+          updatePreferences({
+            ...preferences,
+            default_format: newFormat,
+            use_gpu: newUseGpu
+          });
+        }
       }
     } catch (error) {
       console.error('Error applying preset:', error);
@@ -328,83 +354,127 @@ const ConvertView: React.FC = () => {
 
   // Start conversion
   const startConversion = async () => {
-    if (!selectedFile) {
-      setError({ message: 'Please select a video file before converting', category: ErrorCategory.Validation, timestamp: new Date() });
-      return;
-    }
-
     setIsConverting(true);
-    setProgress(0);
     setError(null);
 
     try {
-      // Prepare conversion options
-      const options: ProcessingOptions = {
-        output_format: outputFormat,
-        output_path: outputPath,
-        use_gpu: use_gpu,
-      };
+      // 1. Lấy ID của file đang được chọn từ state
+      const selectedFileId = conversionState?.selected_file_id;
 
-      // Ensure output path is set
-      if (!outputPath) {
-        setError({ message: 'Please select an output directory', category: ErrorCategory.Validation, timestamp: new Date() });
+      if (!selectedFileId) {
+        setError({ message: 'Please select a file first', category: ErrorCategory.Validation, timestamp: new Date() });
         setIsConverting(false);
         return;
       }
 
-      // Add file extension to the output path
-      options.output_path = `${outputPath}.${outputFormat}`;
+      // 2. Tìm đối tượng file đầy đủ dựa trên ID
+      const fileToConvert = files.find(f => f.id === selectedFileId);
 
-      // Set resolution
-      if (resolution !== 'original') {
-        options.resolution = presetService.resolutionToArray(resolution);
+      if (!fileToConvert || !fileToConvert.path) {
+        setError({ message: 'Selected file path not found. Please try adding the file again.', category: ErrorCategory.Validation, timestamp: new Date() });
+        setIsConverting(false);
+        return;
       }
 
-      // Set bitrate
-      options.bitrate = bitrate * 1000; // Convert from Kbps to bps
+      // 3. Lấy đường dẫn file đầu vào thực tế
+      const inputFilePath = fileToConvert.path;
 
-      // Set framerate
-      if (fps !== 'original') {
-        options.framerate = parseFloat(fps);
+      // --- Xử lý đường dẫn đầu ra ---
+      // 4. Sử dụng giá trị outputPath từ state
+      let finalOutputPath: string = outputPath || '';
+
+      // 5. Nếu outputPath chưa có (người dùng chưa chọn hoặc nhập), tạo đường dẫn mặc định
+      if (!finalOutputPath) {
+        console.log("Output path not set, generating default..."); // Thêm log để debug
+        const generatedPath = await videoService.generateOutputPath(inputFilePath, outputFormat);
+        if (generatedPath) {
+          finalOutputPath = generatedPath;
+          console.log("Generated default output path:", finalOutputPath); // Thêm log để debug
+        }
+
+        // Nếu vẫn không tạo được đường dẫn mặc định -> lỗi
+        if (!finalOutputPath) {
+          setError({ message: 'Could not generate default output path', category: ErrorCategory.Task, timestamp: new Date() });
+          setIsConverting(false);
+          return;
+        }
+        // Cập nhật state của form trên UI nếu cần (có thể không cần thiết nếu optionsForm tự cập nhật)
+        setOutputPath(finalOutputPath);
+      }
+      // --- Kết thúc xử lý đường dẫn đầu ra ---
+
+      // 6. Đảm bảo đường dẫn đầu ra có phần mở rộng phù hợp với định dạng đầu ra
+      if (!finalOutputPath.toLowerCase().endsWith(`.${outputFormat.toLowerCase()}`)) {
+        // Nếu đường dẫn không kết thúc bằng phần mở rộng phù hợp, thêm vào
+        finalOutputPath = `${finalOutputPath}.${outputFormat}`;
+        console.log("Added extension to output path:", finalOutputPath);
       }
 
-      // Set codec
-      if (use_gpu) {
-        options.gpu_codec = await videoService.getGpuCodec(outputFormat);
+      // Xây dựng đối tượng options cho backend
+      const options: ProcessingOptions = {
+        output_format: outputFormat,
+        output_path: finalOutputPath, // <-- Sử dụng biến 'finalOutputPath' đã được xử lý ở trên
+        resolution: resolution !== 'original' ? presetService.resolutionToArray(resolution) : undefined,
+        bitrate: bitrate ? bitrate * 1000 : undefined, // Giả sử backend cần bps
+        framerate: fps !== 'original' ? parseFloat(fps) : undefined,
+        use_gpu: use_gpu,
+        gpu_codec: undefined, // Sẽ được set bên dưới nếu use_gpu là true
+        cpu_codec: undefined, // Sẽ được set bên dưới nếu use_gpu là false
+      };
+
+      // 7. Xác định codec dựa trên lựa chọn GPU/CPU
+      if (options.use_gpu) {
+        options.gpu_codec = await videoService.getGpuCodec(options.output_format);
+         console.log("Using GPU codec:", options.gpu_codec); // Thêm log để debug
       } else {
-        // Get CPU codec suitable for the format
-        options.cpu_codec = videoService.getCpuCodec(outputFormat);
+        options.cpu_codec = videoService.getCpuCodec(options.output_format);
+         console.log("Using CPU codec:", options.cpu_codec); // Thêm log để debug
       }
 
-      // Create and run conversion task
-      const taskId = await videoService.createConversionTask(selectedFile, options);
+      // 8. Gọi service để tạo task ở backend với đường dẫn và options chính xác
+       console.log("Creating conversion task with input:", inputFilePath, "and options:", options); // Thêm log để debug
+      const taskId = await videoService.createConversionTask(inputFilePath, options);
+
+      // 9. Xử lý kết quả tạo task và bắt đầu chạy task
       if (taskId) {
+         console.log("Task created with ID:", taskId); // Thêm log để debug
+        await addTask(taskId);
         const success = await videoService.startConversion(taskId);
         if (success) {
-          // Simulate progress updates (in reality would come from backend)
-          const interval = setInterval(() => {
-            setProgress(prev => {
-              if (prev >= 100) {
-                clearInterval(interval);
-                setIsConverting(false);
-                setShowSuccessDialog(true);
-                setOutputPath(options.output_path);
-                return 100;
-              }
-              return prev + 5;
-            });
-          }, 500);
+           console.log("Conversion started successfully for task:", taskId); // Thêm log để debug
+          // Logic xử lý tiến độ... (giữ nguyên)
+          const checkProgress = setInterval(() => {
+            // Lấy trạng thái chuyển đổi hiện tại từ hook
+            const { conversionState: currentConversionState } = useConversionState();
+            if (currentConversionState) {
+               // Tìm đúng task nếu có nhiều task? Hoặc giả định chỉ có 1 task chạy?
+               // Hiện tại đang dựa vào current_progress chung
+               const taskProgress = currentConversionState.current_progress; // Hoặc tìm progress của task cụ thể
+               console.log(`Task ${taskId} progress: ${taskProgress}`); // Thêm log để debug
+               if (taskProgress >= 100) {
+                 clearInterval(checkProgress);
+                 setIsConverting(false);
+                 setShowSuccessDialog(true);
+                 setOutputPath(options.output_path); // Có thể không cần thiết nếu đã set ở trên
+                 console.log("Conversion complete for task:", taskId); // Thêm log để debug
+               }
+            }
+          }, 1000); // Tăng interval lên 1 giây để giảm log
         } else {
+           console.error("Failed to start conversion for task:", taskId); // Thêm log để debug
+          markTaskFailed(taskId);
           setError({ message: 'Cannot start conversion process', category: ErrorCategory.Task, timestamp: new Date() });
           setIsConverting(false);
         }
       } else {
+         console.error("Failed to create conversion task."); // Thêm log để debug
         setError({ message: 'Cannot create conversion task', category: ErrorCategory.Task, timestamp: new Date() });
         setIsConverting(false);
       }
-    } catch (error) {
-      console.error('Error converting video:', error);
-      setError({ message: 'Error converting video', category: ErrorCategory.Task, timestamp: new Date() });
+    } catch (error: any) {
+      console.error('Error during conversion process:', error); // Log lỗi chi tiết hơn
+      const errorMessage = error.message || 'An unknown error occurred during conversion.';
+      setError({ message: errorMessage, category: ErrorCategory.Task, timestamp: new Date() });
       setIsConverting(false);
     }
   };
@@ -487,7 +557,7 @@ const ConvertView: React.FC = () => {
                 <FileListItem
                   key={file.id}
                   file={file}
-                  isSelected={selectedFile === file.path}
+                  isSelected={selectedFile === file.id}
                   onSelect={handleFileSelect}
                   onRemove={handleFileRemove}
                 />
@@ -537,7 +607,7 @@ const ConvertView: React.FC = () => {
               framerate={parseInt(fps) || 30}
               use_gpu={use_gpu}
               isConverting={isConverting}
-              conversionProgress={progress}
+              conversionProgress={conversionState ? conversionState.current_progress : 0}
               showAdvanced={showAdvanced}
               onPresetChange={(presetName) => {
                 setSelectedPreset(presetName);
@@ -561,17 +631,17 @@ const ConvertView: React.FC = () => {
                     let defaultFileName = 'output_converted';
 
                     // Nếu đã chọn file đầu vào, sử dụng tên của nó làm cơ sở
-                    if (selectedFile) {
-                      const fileName = selectedFile.split(/[\\\/]/).pop() || '';
-                      const fileNameWithoutExt = fileName.split('.')[0];
+                    const selectedFileObj = files.find(f => f.id === selectedFile);
+                    if (selectedFileObj && selectedFileObj.name) {
+                      const fileNameWithoutExt = selectedFileObj.name.split('.')[0];
                       if (fileNameWithoutExt) {
                         defaultFileName = `${fileNameWithoutExt}_converted`;
                       }
                     }
 
                     // Tạo đường dẫn đầy đủ với tên file mặc định
-                    // Không bao gồm phần mở rộng, vì nó sẽ được thêm vào sau
-                    const fullPath = `${selectedDir}/${defaultFileName}`;
+                    // Bao gồm phần mở rộng tương ứng với định dạng đầu ra
+                    const fullPath = `${selectedDir}/${defaultFileName}.${outputFormat}`;
                     setOutputPath(fullPath);
                   }
                 } catch (error) {
