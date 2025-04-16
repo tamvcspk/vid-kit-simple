@@ -1,9 +1,9 @@
 use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
-use tauri::{Manager, Emitter};
+use tauri::{Manager, State, AppHandle, Emitter};
 
 // Thông tin về GPU
-use crate::gpu_detector::GpuInfo;
+use crate::utils::gpu_detector::GpuInfo;
 
 // Định nghĩa các loại state khác nhau
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -113,11 +113,9 @@ impl StateManager {
     }
 }
 
-// Các command Tauri để truy cập state từ frontend
+// Các hàm truy cập state
 
-#[tauri::command]
-pub fn get_app_state(app_handle: tauri::AppHandle) -> Result<AppState, String> {
-    let state_manager = app_handle.state::<StateManager>();
+pub fn get_app_state(state_manager: State<'_, StateManager>) -> Result<AppState, String> {
     let lock_result = state_manager.app.lock();
     match lock_result {
         Ok(app_state) => Ok(app_state.clone()),
@@ -125,10 +123,12 @@ pub fn get_app_state(app_handle: tauri::AppHandle) -> Result<AppState, String> {
     }
 }
 
-#[tauri::command]
-pub fn set_selected_gpu(gpu_index: i32, app_handle: tauri::AppHandle) -> Result<(), String> {
-    let state = app_handle.state::<StateManager>();
-    let lock_result = state.app.lock();
+pub fn set_selected_gpu(
+    gpu_index: i32,
+    state_manager: State<'_, StateManager>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let lock_result = state_manager.app.lock();
     let result = match lock_result {
         Ok(mut app_state) => {
             // Kiểm tra xem index có hợp lệ không
@@ -148,39 +148,33 @@ pub fn set_selected_gpu(gpu_index: i32, app_handle: tauri::AppHandle) -> Result<
     result
 }
 
-#[tauri::command]
-pub fn get_conversion_state(app_handle: tauri::AppHandle) -> Result<ConversionState, String> {
-    let state = app_handle.state::<StateManager>();
-    let lock_result = state.conversion.lock();
+pub fn get_conversion_state(state_manager: State<'_, StateManager>) -> Result<ConversionState, String> {
+    let lock_result = state_manager.conversion.lock();
     match lock_result {
         Ok(conversion_state) => Ok(conversion_state.clone()),
         Err(_) => Err("Failed to acquire conversion state lock".to_string()),
     }
 }
 
-#[tauri::command]
-pub fn get_preferences(app_handle: tauri::AppHandle) -> Result<UserPreferencesState, String> {
-    let state = app_handle.state::<StateManager>();
-    let lock_result = state.preferences.lock();
+pub fn get_preferences(state_manager: State<'_, StateManager>) -> Result<UserPreferencesState, String> {
+    let lock_result = state_manager.preferences.lock();
     match lock_result {
         Ok(preferences) => Ok(preferences.clone()),
         Err(_) => Err("Failed to acquire preferences lock".to_string()),
     }
 }
 
-#[tauri::command]
 pub fn update_preferences(
     new_preferences: UserPreferencesState,
-    app_handle: tauri::AppHandle,
+    state_manager: State<'_, StateManager>,
 ) -> Result<(), String> {
-    let state = app_handle.state::<StateManager>();
-    let lock_result = state.preferences.lock();
+    let lock_result = state_manager.preferences.lock();
     let result = match lock_result {
         Ok(mut preferences) => {
             *preferences = new_preferences.clone();
 
             // Emit sự kiện thông báo preferences đã thay đổi
-            let _ = app_handle.emit("preferences-changed", new_preferences);
+            // let _ = app_handle.emit("preferences-changed", new_preferences);
 
             Ok(())
         },
@@ -189,11 +183,10 @@ pub fn update_preferences(
     result
 }
 
-#[tauri::command]
 pub fn update_conversion_progress(
     task_id: String,
     progress: f32,
-    app_handle: tauri::AppHandle,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
     let state = app_handle.state::<StateManager>();
     let lock_result = state.conversion.lock();
@@ -235,10 +228,9 @@ pub fn update_conversion_progress(
     result
 }
 
-#[tauri::command]
 pub fn add_conversion_task(
     task_id: String,
-    app_handle: tauri::AppHandle,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
     let state = app_handle.state::<StateManager>();
     let lock_result = state.conversion.lock();
@@ -257,10 +249,9 @@ pub fn add_conversion_task(
     result
 }
 
-#[tauri::command]
 pub fn mark_task_failed(
     task_id: String,
-    app_handle: tauri::AppHandle,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
     let state = app_handle.state::<StateManager>();
     let lock_result = state.conversion.lock();
@@ -281,35 +272,18 @@ pub fn mark_task_failed(
     result
 }
 
-// Command để thêm file vào danh sách
-#[tauri::command]
+// File management functions
 pub fn add_file_to_list(
-    id: String,
-    name: String,
-    path: String,
-    size: u64,
-    file_type: String,
-    duration: Option<f64>,
-    resolution: Option<(u32, u32)>,
-    thumbnail: Option<String>,
-    app_handle: tauri::AppHandle,
+    file_info: FileInfo,
+    state_manager: State<'_, StateManager>,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
-    let state = app_handle.state::<StateManager>();
-    let lock_result = state.conversion.lock();
+    let lock_result = state_manager.conversion.lock();
     let result = match lock_result {
         Ok(mut conversion) => {
             // Kiểm tra xem file đã tồn tại trong danh sách chưa
-            if !conversion.files.iter().any(|f| f.path == path) {
-                conversion.files.push(FileInfo {
-                    id,
-                    name,
-                    path,
-                    size,
-                    file_type,
-                    duration,
-                    resolution,
-                    thumbnail,
-                });
+            if !conversion.files.iter().any(|f| f.path == file_info.path) {
+                conversion.files.push(file_info);
 
                 // Nếu chưa có file nào được chọn, chọn file đầu tiên
                 if conversion.selected_file_id.is_none() && !conversion.files.is_empty() {
@@ -327,14 +301,12 @@ pub fn add_file_to_list(
     result
 }
 
-// Command để xóa file khỏi danh sách
-#[tauri::command]
 pub fn remove_file_from_list(
     file_id: String,
-    app_handle: tauri::AppHandle,
+    state_manager: State<'_, StateManager>,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
-    let state = app_handle.state::<StateManager>();
-    let lock_result = state.conversion.lock();
+    let lock_result = state_manager.conversion.lock();
     let result = match lock_result {
         Ok(mut conversion) => {
             // Tìm vị trí của file trong danh sách
@@ -362,40 +334,43 @@ pub fn remove_file_from_list(
     result
 }
 
-// Command để chọn file
-#[tauri::command]
 pub fn select_file(
-    file_id: String,
-    app_handle: tauri::AppHandle,
+    file_id: Option<String>,
+    state_manager: State<'_, StateManager>,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
-    let state = app_handle.state::<StateManager>();
-    let lock_result = state.conversion.lock();
+    let lock_result = state_manager.conversion.lock();
     let result = match lock_result {
         Ok(mut conversion) => {
-            // Kiểm tra xem file có tồn tại trong danh sách không
-            if conversion.files.iter().any(|f| f.id == file_id) {
-                conversion.selected_file_id = Some(file_id);
-
-                // Emit sự kiện thông báo conversion state đã thay đổi
-                let _ = app_handle.emit("conversion-state-changed", conversion.clone());
-
-                Ok(())
-            } else {
-                Err(format!("File with id {} not found", file_id))
+            match file_id {
+                Some(id) => {
+                    // Kiểm tra xem file có tồn tại trong danh sách không
+                    if conversion.files.iter().any(|f| f.id == id) {
+                        conversion.selected_file_id = Some(id);
+                    } else {
+                        return Err(format!("File with id {} not found", id));
+                    }
+                },
+                None => {
+                    conversion.selected_file_id = None;
+                }
             }
+
+            // Emit sự kiện thông báo conversion state đã thay đổi
+            let _ = app_handle.emit("conversion-state-changed", conversion.clone());
+
+            Ok(())
         },
         Err(_) => Err("Failed to acquire conversion state lock".to_string()),
     };
     result
 }
 
-// Command để xóa tất cả file
-#[tauri::command]
 pub fn clear_file_list(
-    app_handle: tauri::AppHandle,
+    state_manager: State<'_, StateManager>,
+    app_handle: AppHandle,
 ) -> Result<(), String> {
-    let state = app_handle.state::<StateManager>();
-    let lock_result = state.conversion.lock();
+    let lock_result = state_manager.conversion.lock();
     let result = match lock_result {
         Ok(mut conversion) => {
             conversion.files.clear();
@@ -411,9 +386,8 @@ pub fn clear_file_list(
     result
 }
 
-// Command để lưu preferences vào file
-#[tauri::command]
-pub fn save_preferences_to_file(app_handle: tauri::AppHandle) -> Result<(), String> {
+// Preferences file operations
+pub fn save_preferences_to_file(app_handle: AppHandle) -> Result<(), String> {
     let state = app_handle.state::<StateManager>();
     let preferences_lock = state.preferences.lock();
     let preferences = preferences_lock.map_err(|_| "Failed to acquire preferences lock".to_string())?;
@@ -439,9 +413,7 @@ pub fn save_preferences_to_file(app_handle: tauri::AppHandle) -> Result<(), Stri
     Ok(())
 }
 
-// Command để load preferences từ file
-#[tauri::command]
-pub fn load_preferences_from_file(app_handle: tauri::AppHandle) -> Result<UserPreferencesState, String> {
+pub fn load_preferences_from_file(app_handle: AppHandle) -> Result<(), String> {
     // Lấy đường dẫn đến thư mục cấu hình
     let app_dir = app_handle.path().app_data_dir()
         .map_err(|_| "Failed to get app directory".to_string())?;
@@ -450,7 +422,7 @@ pub fn load_preferences_from_file(app_handle: tauri::AppHandle) -> Result<UserPr
 
     // Kiểm tra xem file có tồn tại không
     if !config_file.exists() {
-        return Ok(UserPreferencesState::default());
+        return Ok(());
     }
 
     // Đọc file
@@ -468,23 +440,20 @@ pub fn load_preferences_from_file(app_handle: tauri::AppHandle) -> Result<UserPr
     *preferences = loaded_preferences.clone();
 
     // Emit sự kiện thông báo preferences đã thay đổi
-    let _ = app_handle.emit("preferences-changed", loaded_preferences.clone());
+    let _ = app_handle.emit("preferences-changed", loaded_preferences);
 
-    Ok(loaded_preferences)
+    Ok(())
 }
 
-// Command để lấy toàn bộ state
-#[tauri::command]
-pub fn get_global_state(app_handle: tauri::AppHandle) -> Result<GlobalState, String> {
-    let state = app_handle.state::<StateManager>();
-
-    let app_lock = state.app.lock();
+// Global state access
+pub fn get_global_state(state_manager: State<'_, StateManager>) -> Result<GlobalState, String> {
+    let app_lock = state_manager.app.lock();
     let app_state = app_lock.map_err(|_| "Failed to acquire app state lock".to_string())?;
 
-    let conversion_lock = state.conversion.lock();
+    let conversion_lock = state_manager.conversion.lock();
     let conversion_state = conversion_lock.map_err(|_| "Failed to acquire conversion state lock".to_string())?;
 
-    let preferences_lock = state.preferences.lock();
+    let preferences_lock = state_manager.preferences.lock();
     let preferences_state = preferences_lock.map_err(|_| "Failed to acquire preferences lock".to_string())?;
 
     Ok(GlobalState {

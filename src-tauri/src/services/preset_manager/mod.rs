@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Runtime, Manager};
 
 /// Defines a preset for video conversion with configurable parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,10 +52,10 @@ impl PresetManager {
     }
 
     /// Creates a PresetManager using a fixed directory for tests
-    pub fn from_app_handle<R: Runtime>(_app_handle: &AppHandle<R>) -> io::Result<Self> {
-        // Trong Tauri 2, cấu trúc AppHandle đã thay đổi
-        // Để đơn giản hóa, sử dụng đường dẫn cố định cho thử nghiệm
-        let app_data_dir = std::env::temp_dir().join("vid-kit-simple");
+    pub fn from_app_handle<R: Runtime>(app_handle: &AppHandle<R>) -> io::Result<Self> {
+        // Lấy đường dẫn đến thư mục dữ liệu của ứng dụng
+        let app_data_dir = app_handle.path().app_data_dir()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         let presets_dir = app_data_dir.join("presets");
         Self::new(presets_dir)
     }
@@ -180,69 +180,4 @@ impl PresetManager {
     fn get_preset_path(&self, id: &str) -> PathBuf {
         self.presets_dir.join(format!("{}.json", id))
     }
-}
-
-// Tạo các hàm Tauri command
-
-#[tauri::command]
-pub async fn list_presets<R: Runtime>(
-    app_handle: tauri::AppHandle<R>,
-) -> Result<Vec<ConversionPreset>, String> {
-    let preset_manager = PresetManager::from_app_handle(&app_handle)
-        .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-
-    preset_manager
-        .list_presets()
-        .map_err(|e| format!("Failed to list presets: {}", e))
-}
-
-#[tauri::command]
-pub async fn get_preset<R: Runtime>(
-    id: String,
-    app_handle: tauri::AppHandle<R>,
-) -> Result<ConversionPreset, String> {
-    let preset_manager = PresetManager::from_app_handle(&app_handle)
-        .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-
-    preset_manager
-        .get_preset(&id)
-        .map_err(|e| format!("Failed to get preset: {}", e))
-}
-
-#[tauri::command]
-pub async fn save_preset<R: Runtime>(
-    preset: ConversionPreset,
-    app_handle: tauri::AppHandle<R>,
-) -> Result<(), String> {
-    let preset_manager = PresetManager::from_app_handle(&app_handle)
-        .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-
-    preset_manager
-        .save_preset(&preset)
-        .map_err(|e| format!("Failed to save preset: {}", e))
-}
-
-#[tauri::command]
-pub async fn delete_preset<R: Runtime>(
-    id: String,
-    app_handle: tauri::AppHandle<R>,
-) -> Result<(), String> {
-    let preset_manager = PresetManager::from_app_handle(&app_handle)
-        .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-
-    preset_manager
-        .delete_preset(&id)
-        .map_err(|e| format!("Failed to delete preset: {}", e))
-}
-
-#[tauri::command]
-pub async fn create_default_presets<R: Runtime>(
-    app_handle: tauri::AppHandle<R>,
-) -> Result<(), String> {
-    let preset_manager = PresetManager::from_app_handle(&app_handle)
-        .map_err(|e| format!("Failed to initialize preset manager: {}", e))?;
-
-    preset_manager
-        .create_default_presets()
-        .map_err(|e| format!("Failed to create default presets: {}", e))
 }

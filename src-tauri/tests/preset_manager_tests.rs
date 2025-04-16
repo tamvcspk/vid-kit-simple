@@ -1,4 +1,4 @@
-use vid_kit_simple_lib::preset_manager::{ConversionPreset, PresetManager, Resolution};
+use vid_kit_simple_lib::services::preset_manager::{ConversionPreset, PresetManager, Resolution};
 
 fn setup_test_dir() -> tempfile::TempDir {
     tempfile::tempdir().expect("Failed to create temporary directory")

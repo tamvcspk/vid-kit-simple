@@ -1,6 +1,6 @@
 ## **Overview Architecture**
 
-The application is built using a client-server model, separating the frontend and backend to leverage the strengths of each technology. The frontend is developed with React (TypeScript, SCSS) using the PrimeReact library for UI, while the backend is built with Rust, directly integrating with ffmpeg (using static libraries) for video processing. Tauri acts as the bridge between these two parts, providing a secure and efficient API.
+The application is built using a client-server model, separating the frontend and backend to leverage the strengths of each technology. The frontend is developed with React (TypeScript, SCSS) using the PrimeReact library for UI, while the backend is built with Rust, integrating with FFmpeg through the ffmpeg-next crate for video processing. Tauri acts as the bridge between these two parts, providing a secure and efficient API.
 
 ---
 
@@ -17,13 +17,15 @@ The application is built using a client-server model, separating the frontend an
 
 ## **2. Backend**
 
-- **Technology:** Rust.
-- **Video Processing:**
-  - **VideoProcessor:** Performs tasks like converting, splitting, editing, and sanitizing videos by calling ffmpeg through static libraries.
+- **Technology:** Rust with Tauri v2.
+- **Core Services:**
+  - **VideoProcessor:** Performs tasks like converting, splitting, editing, and sanitizing videos by integrating with FFmpeg through the ffmpeg-next crate.
+  - **PresetManager:** Stores and manages user presets in JSON files, allowing users to easily edit or back up configurations.
   - **GPUDetector:** Checks GPU acceleration capabilities and configures corresponding codecs (e.g., h264_nvenc, hevc_nvenc, scale_cuda for NVIDIA, h264_qsv for Intel, h264_amf for AMD).
-- **Preset Management:**
-  - **PresetManager:** Stores and manages user presets in JSON files. This is a simple and suitable choice for small data volumes, allowing users to easily edit or back up configurations.
-- **Frontend Communication:** Uses Tauri commands to receive requests and return results, ensuring secure and efficient communication between the frontend and backend.
+  - **StateManager:** Manages application state including preferences, conversion tasks, and GPU information.
+- **Command Layer:** Exposes Rust functions to the frontend through Tauri commands, providing a clean API for frontend-backend communication.
+- **State Management:** Uses Tauri's state management capabilities to maintain application state across command invocations.
+- **Event System:** Utilizes Tauri events for asynchronous communication, especially for progress updates and long-running tasks.
 
 ---
 
@@ -34,11 +36,34 @@ VidKitSimple/
 ├── src-tauri/                # Rust backend code
 │   ├── src/
 │   │   ├── main.rs           # Entry point for Rust backend
-│   │   ├── video_processor.rs  # Video processing functionality
-│   │   ├── preset_manager.rs   # Preset management
-│   │   ├── gpu_detector.rs     # GPU detection and configuration
-│   │   └── lib.rs             # Library exports
-│   └── Cargo.toml           # Rust dependencies
+│   │   ├── lib.rs            # Library exports and Tauri setup
+│   │   ├── commands/         # Command handlers exposed to frontend
+│   │   │   ├── mod.rs        # Exports all commands
+│   │   │   └── video.rs      # Video-related commands
+│   │   ├── services/         # Core business logic modules
+│   │   │   ├── mod.rs        # Exports all services
+│   │   │   ├── video_processor/  # Video processing functionality
+│   │   │   │   ├── mod.rs    # Exports video processor components
+│   │   │   │   ├── encoder.rs # Video encoding logic
+│   │   │   │   └── filter.rs  # Video filtering logic
+│   │   │   ├── preset_manager/ # Preset management
+│   │   │   │   ├── mod.rs    # Exports preset manager components
+│   │   │   │   └── config.rs # Preset configuration handling
+│   │   │   └── database/     # Database operations (if needed)
+│   │   │       ├── mod.rs    # Exports database components
+│   │   │       └── models.rs # Data models
+│   │   ├── state/           # Application state management
+│   │   │   ├── mod.rs       # Exports state components
+│   │   │   └── app_state.rs # Application state definitions
+│   │   └── utils/           # Utility functions and helpers
+│   │       ├── mod.rs       # Exports utility functions
+│   │       ├── gpu_detector.rs # GPU detection and configuration
+│   │       └── error.rs     # Error handling utilities
+│   ├── build.rs            # Build script for FFmpeg integration
+│   ├── config.toml         # Configuration for build process
+│   ├── Cargo.toml          # Rust dependencies
+│   ├── tauri.conf.json     # Tauri configuration
+│   └── icons/              # Application icons
 ├── src/                     # Frontend React code
 │   ├── assets/               # Static assets (images, icons)
 │   ├── components/           # Reusable UI components
@@ -79,11 +104,10 @@ VidKitSimple/
 │   ├── App.tsx               # Root component
 │   ├── index.tsx             # Application entry point
 │   └── routes.tsx            # Routing configuration
-├── third_party/              # Third-party dependencies
-│   └── ffmpeg/               # FFmpeg libraries
-│       ├── include/          # Header files
-│       ├── lib/              # Static libraries (.a, .lib)
-│       └── bin/              # Optional: Executable tools
+├── .cargo/                  # Cargo configuration
+│   └── config.toml           # Cargo configuration for FFmpeg paths
+├── third_party/              # Third-party dependencies (if needed)
+│   └── ffmpeg/               # FFmpeg DLLs for Windows (copied by build script)
 ├── docs/                     # Documentation
 │   └── architecture.md       # Architecture documentation
 ├── tauri.conf.json           # Tauri configuration
@@ -103,9 +127,11 @@ VidKitSimple/
    - Frontend services handle events and call Tauri commands, passing requests to the backend.
 
 3. **Task Processing:**
-   - The Rust backend receives requests and executes video tasks via ffmpeg.
+   - The Rust backend receives requests through Tauri commands and delegates to appropriate service modules.
+   - VideoProcessor executes video tasks via FFmpeg integration through the ffmpeg-next crate.
    - GPUDetector checks and configures GPU acceleration if available.
    - PresetManager retrieves configurations from JSON files to apply to tasks.
+   - StateManager maintains application state and provides progress updates via events.
 
 4. **Result Feedback:**
    - After processing, the backend returns results via Tauri events.
@@ -121,9 +147,12 @@ VidKitSimple/
   - **Services:** Handle business logic and communicate with the backend via Tauri commands.
 
 - **Backend:**
-  - **VideoProcessor:** Handles video operations (convert, split, edit, sanitize) via ffmpeg.
-  - **PresetManager:** Manages user presets in JSON format.
-  - **GPUDetector:** Checks GPU acceleration capabilities and configures appropriate codecs.
+  - **Commands:** Handle requests from the frontend and delegate to appropriate services.
+  - **Services:** Core business logic modules that implement the application's functionality:
+    - **VideoProcessor:** Handles video operations (convert, split, edit, sanitize) via FFmpeg.
+    - **PresetManager:** Manages user presets in JSON format.
+  - **State:** Manages application state and provides access to shared data.
+  - **Utils:** Utility functions including GPU detection and error handling.
 
 - **Tauri Bridge:** Acts as the bridge between the frontend and backend, ensuring secure and efficient communication.
 
@@ -145,6 +174,10 @@ VidKitSimple/
 
 ## **Conclusion**
 
-This architecture leverages Tauri's power to combine a modern frontend (React, TypeScript, SCSS, PrimeReact) with a robust Rust backend. The clear separation between interface and business logic ensures the application is maintainable, scalable, and performant when handling complex video tasks. Using JSON for PresetManager is suitable for small data volumes and the application's simple requirements, while Rust provides safety and optimal performance for ffmpeg-related processing.
+This architecture leverages Tauri's power to combine a modern frontend (React, TypeScript, SCSS, PrimeReact) with a robust Rust backend. The clear separation between interface and business logic ensures the application is maintainable, scalable, and performant when handling complex video tasks. Using JSON for PresetManager is suitable for small data volumes and the application's simple requirements, while Rust provides safety and optimal performance for FFmpeg-related processing.
 
-The feature-based directory structure enhances modularity and maintainability, making it easier to extend the application with new features while keeping related code together. This organization also improves team collaboration by allowing developers to work on separate features with minimal conflicts.
+The modular directory structure enhances maintainability and scalability in both frontend and backend:
+
+- **Frontend:** The feature-based organization keeps related code together, making it easier to extend the application with new features while minimizing conflicts during team collaboration.
+
+- **Backend:** The layered architecture with clear separation between commands, services, and utilities promotes code reuse and maintainability. This organization follows best practices for Rust projects and Tauri applications, making the codebase easier to navigate and extend as the application grows.

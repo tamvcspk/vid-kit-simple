@@ -1,4 +1,4 @@
-use vid_kit_simple_lib::gpu_detector::{
+use vid_kit_simple_lib::utils::gpu_detector::{
     check_ffmpeg_codec, check_gpu_availability, GpuInfo, GpuList,
 };
 

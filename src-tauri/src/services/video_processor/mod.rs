@@ -237,8 +237,8 @@ impl VideoProcessor {
                 }
             };
 
-            // Sử dụng codec đơn giản hơn để tránh lỗi
-            let codec_id = codec::Id::MPEG4; // Sử dụng MPEG4 thay vì H264 để tránh lỗi với MFT
+            // Sử dụng H264 codec thay vì MPEG4 để tránh lỗi B-frames
+            let codec_id = codec::Id::H264; // H264 có nhiều tùy chọn hơn và được hỗ trợ rộng rãi
 
             let encoder_codec = match encoder::find(codec_id) {
                 Some(codec) => codec,
@@ -293,8 +293,12 @@ impl VideoProcessor {
             enc.set_frame_rate(Some(Rational::new(25, 1))); // Sử dụng framerate ổn định 25fps
 
             // Thiết lập các tham số codec
-            enc.set_max_b_frames(0); // Không sử dụng B-frames
-            enc.set_gop(10); // Thiết lập GOP size
+            enc.set_max_b_frames(0); // Không sử dụng B-frames để tránh lỗi
+            enc.set_gop(25); // Thiết lập GOP size (1 giây với 25fps)
+
+            // Thêm các tham số để tránh lỗi timestamp
+            enc.set_flags(ffmpeg::codec::flag::Flags::GLOBAL_HEADER);
+            output_stream.set_time_base(Rational::new(1, 25000)); // Timebase chi tiết hơn
 
             if let Some(bitrate) = task.options.bitrate {
                 // Chuyển đổi bitrate từ u64 sang usize
@@ -372,8 +376,9 @@ impl VideoProcessor {
                             continue;
                         }
 
-                        // Thiết lập timestamp cho frame
-                        scaled_frame.set_pts(Some(frame_count as i64));
+                        // Thiết lập timestamp cho frame với giá trị tăng dần
+                        // Sử dụng frame_count * 1000 để đảm bảo không có timestamp trùng lặp
+                        scaled_frame.set_pts(Some(frame_count * 1000));
                         scaled_frame.set_kind(decoded_frame.kind());
 
                         // Gửi frame đến encoder
@@ -419,8 +424,9 @@ impl VideoProcessor {
                     continue;
                 }
 
-                // Thiết lập timestamp cho frame
-                scaled_frame.set_pts(Some(frame_count as i64));
+                // Thiết lập timestamp cho frame với giá trị tăng dần
+                frame_count += 1; // Tăng frame_count để tránh timestamp trùng lặp
+                scaled_frame.set_pts(Some(frame_count * 1000));
                 scaled_frame.set_kind(decoded_frame.kind());
 
                 // Gửi frame đến encoder
@@ -470,8 +476,6 @@ impl VideoProcessor {
 
             // Báo hiệu hoàn thành
             let _ = tx.send((task_id_clone.clone(), 100.0));
-
-
         });
 
         Ok(())
@@ -502,55 +506,13 @@ impl VideoProcessor {
             .collect()
     }
 
-    /// Hủy tác vụ theo ID
-    pub fn cancel_task(&mut self, task_id: &str) -> Result<(), String> {
-        let task_index = self
-            .tasks
-            .iter()
-            .position(|t| t.id == task_id)
-            .ok_or_else(|| format!("Không tìm thấy tác vụ có ID: {}", task_id))?;
-
-        // Trong thực tế, cần phải kill tiến trình FFmpeg
-        // Đây chỉ là cách đơn giản để cập nhật trạng thái
-        self.tasks[task_index].status =
-            ProcessingStatus::Failed("Tác vụ bị hủy bởi người dùng".to_string());
-
-        Ok(())
-    }
-
-    /// Xóa tất cả các tác vụ đã hoàn thành
-    pub fn clear_completed_tasks(&mut self) {
-        self.tasks
-            .retain(|task| !matches!(task.status, ProcessingStatus::Complete));
+    /// Lấy thông tin về một tác vụ
+    pub fn get_task(&self, task_id: &str) -> Option<&ProcessingTask> {
+        self.tasks.iter().find(|t| t.id == task_id)
     }
 
     /// Lấy danh sách tất cả các tác vụ
-    pub fn get_all_tasks(&self) -> Vec<ProcessingTask> {
-        self.tasks.clone()
-    }
-}
-
-// Đăng ký với Tauri
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_create_task() {
-        let mut processor = VideoProcessor::new();
-        let options = ProcessingOptions {
-            output_format: "mp4".to_string(),
-            output_path: "output.mp4".to_string(),
-            resolution: Some((1280, 720)),
-            bitrate: Some(2000000),
-            framerate: Some(30.0),
-            use_gpu: false,
-            gpu_codec: None,
-            cpu_codec: Some("libx264".to_string()),
-        };
-
-        let task_id = processor.create_task("input.mp4", options);
-        assert_eq!(task_id, "task_0");
-        assert_eq!(processor.tasks.len(), 1);
+    pub fn get_tasks(&self) -> &[ProcessingTask] {
+        &self.tasks
     }
 }

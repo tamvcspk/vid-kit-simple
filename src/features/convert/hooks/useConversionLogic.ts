@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { videoService, presetService } from '../../../services';
 import { useConversionState } from '../../../hooks/useConversionState';
+import useConversionStore from '../../../store/conversion-state';
 import { useError } from '../../../hooks';
 import { ProcessingOptions } from '../../../types';
 import { ErrorCategory } from '../../../utils';
@@ -113,13 +113,14 @@ export const useConversionLogic = () => {
         if (success) {
           console.log("Conversion started successfully for task:", taskId); // Thêm log để debug
           // Logic xử lý tiến độ... (giữ nguyên)
+          // Sử dụng store trực tiếp để lấy state mới nhất
           const checkProgress = setInterval(() => {
-            // Lấy trạng thái chuyển đổi hiện tại từ hook
-            const { conversionState: currentConversionState } = useConversionState();
-            if (currentConversionState) {
+            // Lấy trạng thái chuyển đổi hiện tại trực tiếp từ store
+            const currentState = useConversionStore.getState().data;
+            if (currentState) {
               // Tìm đúng task nếu có nhiều task? Hoặc giả định chỉ có 1 task chạy?
               // Hiện tại đang dựa vào current_progress chung
-              const taskProgress = currentConversionState.current_progress; // Hoặc tìm progress của task cụ thể
+              const taskProgress = currentState.current_progress; // Hoặc tìm progress của task cụ thể
               console.log(`Task ${taskId} progress: ${taskProgress}`); // Thêm log để debug
               if (taskProgress >= 100) {
                 clearInterval(checkProgress);
