@@ -15,7 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        // Thêm state vào ứng dụng
+        // Add state to the application
         .manage(init_processor_state())
         .manage(StateManager::new())
         .invoke_handler(tauri::generate_handler![
@@ -59,10 +59,10 @@ pub fn run() {
             commands::set_selected_gpu,
         ])
         .setup(|app| {
-            // Khởi tạo state manager với thông tin FFmpeg và GPU
+            // Initialize state manager with FFmpeg and GPU information
             let state_manager = app.state::<StateManager>();
 
-            // Kiểm tra GPU và lấy danh sách GPU
+            // Check GPU and get list of GPUs
             let (gpu_available, gpus) = match check_gpu_availability() {
                 Ok(gpu_list) => {
                     let is_available = gpu_list.gpus.iter().any(|gpu| gpu.is_available);
@@ -71,13 +71,13 @@ pub fn run() {
                 Err(_) => (false, Vec::new()),
             };
 
-            // Lấy phiên bản FFmpeg (có thể thêm hàm vào video_processor để lấy phiên bản)
-            let ffmpeg_version = Some("FFmpeg 6.0".to_string()); // Thay bằng hàm thực tế
+            // Get FFmpeg version (could add a function to video_processor to get version)
+            let ffmpeg_version = Some("FFmpeg 6.0".to_string()); // Replace with actual function
 
-            // Khởi tạo state
+            // Initialize state
             state_manager.initialize(ffmpeg_version, gpu_available, gpus);
 
-            // Load preferences từ file
+            // Load preferences from file
             let app_handle = app.app_handle().clone();
             let _ = state::load_preferences_from_file(app_handle);
 

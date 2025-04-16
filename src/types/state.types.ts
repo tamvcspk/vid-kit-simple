@@ -1,6 +1,6 @@
-// Định nghĩa kiểu dữ liệu cho state từ Rust
+// Type definitions for state from Rust
 
-// Thông tin về GPU
+// GPU information
 export interface GpuInfo {
   name: string;
   vendor: string;
@@ -8,17 +8,17 @@ export interface GpuInfo {
   supported_codecs: string[];
 }
 
-// Thông tin chung về ứng dụng
+// General application information
 export interface AppState {
   is_initialized: boolean;
   app_version: string;
   ffmpeg_version: string | null;
   gpu_available: boolean;
   gpus: GpuInfo[];
-  selected_gpu_index: number; // -1 cho CPU, 0+ cho GPU
+  selected_gpu_index: number; // -1 for CPU, 0+ for GPU
 }
 
-// Thông tin về file video
+// Video file information
 export interface FileInfo {
   id: string;
   name: string;
@@ -30,7 +30,7 @@ export interface FileInfo {
   thumbnail?: string;
 }
 
-// Trạng thái chuyển đổi video
+// Video conversion state
 export interface ConversionState {
   active_tasks: string[];
   completed_tasks: string[];
@@ -40,7 +40,7 @@ export interface ConversionState {
   selected_file_id: string | null;
 }
 
-// Tùy chọn người dùng
+// User preferences
 export interface UserPreferencesState {
   default_output_dir: string | null;
   default_format: string;
@@ -48,7 +48,7 @@ export interface UserPreferencesState {
   theme: string;
 }
 
-// Global state kết hợp tất cả các state
+// Global state combining all states
 export interface GlobalState {
   app: AppState;
   conversion: ConversionState;

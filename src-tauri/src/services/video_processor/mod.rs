@@ -39,7 +39,7 @@ pub struct ProcessingOptions {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProcessingStatus {
     Pending,
-    Running(f32), // Tiến độ (0.0 - 100.0)
+    Running(f32), // Progress (0.0 - 100.0)
     Complete,
     Failed(String),
 }
@@ -70,51 +70,51 @@ impl VideoProcessor {
         }
     }
 
-    /// Lấy thông tin về tệp video
+    /// Get video file information
     pub fn get_video_info(&self, file_path: &str) -> Result<VideoInfo, String> {
-        // Chuẩn hóa đường dẫn để đảm bảo nó hoạt động trên mọi hệ điều hành
+        // Normalize path to ensure it works on all operating systems
         let normalized_path = file_path.replace("\\", "/");
 
         let input_ctx = input(&normalized_path)
-            .map_err(|e| format!("Không thể mở tệp video: {}", e))?;
+            .map_err(|e| format!("Cannot open video file: {}", e))?;
 
         let stream = input_ctx
             .streams()
             .best(MediaType::Video)
-            .ok_or_else(|| "Không tìm thấy luồng video".to_string())?;
+            .ok_or_else(|| "Video stream not found".to_string())?;
 
         let codec_ctx = ffmpeg::codec::context::Context::from_parameters(stream.parameters())
-            .map_err(|e| format!("Không thể tạo context từ parameters: {}", e))?;
+            .map_err(|e| format!("Cannot create context from parameters: {}", e))?;
 
         let decoder = codec_ctx.decoder()
             .video()
-            .map_err(|e| format!("Không thể tạo decoder: {}", e))?;
+            .map_err(|e| format!("Cannot create decoder: {}", e))?;
 
-        // Lấy thông tin định dạng
+        // Get format information
         let format_name = input_ctx.format().name().to_string();
 
-        // Lấy thông tin thời lượng
+        // Get duration information
         let duration = if input_ctx.duration() > 0 {
             input_ctx.duration() as f64 / f64::from(ffmpeg::ffi::AV_TIME_BASE)
         } else {
             0.0
         };
 
-        // Lấy thông tin bitrate
+        // Get bitrate information
         let bitrate = if input_ctx.bit_rate() > 0 {
             input_ctx.bit_rate() as u64
         } else {
             0
         };
 
-        // Lấy thông tin framerate
+        // Get framerate information
         let framerate = if stream.avg_frame_rate().numerator() != 0 {
             stream.avg_frame_rate().numerator() as f32 / stream.avg_frame_rate().denominator() as f32
         } else {
             0.0
         };
 
-        // Lấy thông tin codec
+        // Get codec information
         let codec_name = match decoder.codec() {
             Some(codec) => codec.name().to_string(),
             None => "unknown".to_string(),
@@ -132,7 +132,7 @@ impl VideoProcessor {
         })
     }
 
-    /// Tạo một tác vụ xử lý mới
+    /// Create a new processing task
     pub fn create_task(&mut self, input_file: &str, options: ProcessingOptions) -> String {
         let task_id = format!("task_{}", self.tasks.len());
 
@@ -147,70 +147,70 @@ impl VideoProcessor {
         task_id
     }
 
-    /// Chạy tác vụ xử lý theo ID
+    /// Run processing task by ID
     pub fn run_task(&mut self, task_id: &str) -> Result<(), String> {
         let task_index = self
             .tasks
             .iter()
             .position(|t| t.id == task_id)
-            .ok_or_else(|| format!("Không tìm thấy tác vụ có ID: {}", task_id))?;
+            .ok_or_else(|| format!("Task with ID {} not found", task_id))?;
 
-        // Cập nhật trạng thái
+        // Update status
         self.tasks[task_index].status = ProcessingStatus::Running(0.0);
 
-        // Tạo channel để cập nhật tiến độ
+        // Create channel for progress updates
         let (tx, rx) = channel();
         self.progress_channel = Some((tx.clone(), rx));
 
-        // Clone task để sử dụng trong thread
+        // Clone task to use in thread
         let task = self.tasks[task_index].clone();
         let task_id_clone = task_id.to_string();
 
-        // Spawn một luồng để xử lý video
+        // Spawn a thread to process video
         thread::spawn(move || {
-            // Tạo thư mục đầu ra nếu không tồn tại
+            // Create output directory if it doesn't exist
             if let Some(parent) = Path::new(&task.options.output_path).parent() {
                 if let Err(e) = fs::create_dir_all(parent) {
-                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể tạo thư mục đầu ra: {}", e);
+                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Signal error
+                    eprintln!("Cannot create output directory: {}", e);
                     return;
                 }
             }
 
-            // Chuẩn hóa đường dẫn đầu vào
+            // Normalize input path
             let normalized_input_path = task.input_file.replace("\\", "/");
             eprintln!("Input path: {}", normalized_input_path);
 
-            // Mở tệp đầu vào
+            // Open input file
             let mut input_ctx = match input(&normalized_input_path) {
                 Ok(ctx) => ctx,
                 Err(e) => {
-                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể mở tệp đầu vào: {}", e);
+                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Signal error
+                    eprintln!("Cannot open input file: {}", e);
                     return;
                 }
             };
 
-            // Chuẩn hóa đường dẫn đầu ra
+            // Normalize output path
             let normalized_output_path = task.options.output_path.replace("\\", "/");
             eprintln!("Output path: {}", normalized_output_path);
 
-            // Tạo output context
+            // Create output context
             let mut output_ctx = match output(&normalized_output_path) {
                 Ok(ctx) => ctx,
                 Err(e) => {
-                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể tạo output context: {}", e);
+                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Signal error
+                    eprintln!("Cannot create output context: {}", e);
                     return;
                 }
             };
 
-            // Tìm luồng video
+            // Find video stream
             let input_stream = match input_ctx.streams().best(MediaType::Video) {
                 Some(stream) => stream,
                 None => {
-                    let _ = tx.send((task_id_clone, -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không tìm thấy luồng video");
+                    let _ = tx.send((task_id_clone, -1.0)); // Signal error
+                    eprintln!("Video stream not found");
                     return;
                 }
             };
@@ -218,12 +218,12 @@ impl VideoProcessor {
             let input_stream_index = input_stream.index();
             let input_time_base = input_stream.time_base();
 
-            // Tạo decoder
+            // Create decoder
             let decoder_ctx = match ffmpeg::codec::context::Context::from_parameters(input_stream.parameters()) {
                 Ok(ctx) => ctx,
                 Err(e) => {
-                    let _ = tx.send((task_id_clone, -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể tạo decoder context: {}", e);
+                    let _ = tx.send((task_id_clone, -1.0)); // Signal error
+                    eprintln!("Cannot create decoder context: {}", e);
                     return;
                 }
             };
@@ -231,48 +231,48 @@ impl VideoProcessor {
             let mut decoder = match decoder_ctx.decoder().video() {
                 Ok(dec) => dec,
                 Err(e) => {
-                    let _ = tx.send((task_id_clone, -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể tạo video decoder: {}", e);
+                    let _ = tx.send((task_id_clone, -1.0)); // Signal error
+                    eprintln!("Cannot create video decoder: {}", e);
                     return;
                 }
             };
 
-            // Sử dụng H264 codec thay vì MPEG4 để tránh lỗi B-frames
-            let codec_id = codec::Id::H264; // H264 có nhiều tùy chọn hơn và được hỗ trợ rộng rãi
+            // Use H264 codec instead of MPEG4 to avoid B-frames issues
+            let codec_id = codec::Id::H264; // H264 has more options and is widely supported
 
             let encoder_codec = match encoder::find(codec_id) {
                 Some(codec) => codec,
                 None => {
-                    let _ = tx.send((task_id_clone, -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không tìm thấy encoder codec");
+                    let _ = tx.send((task_id_clone, -1.0)); // Signal error
+                    eprintln!("Encoder codec not found");
                     return;
                 }
             };
 
-            // Tạo stream đầu ra
+            // Create output stream
             let mut output_stream = match output_ctx.add_stream(encoder_codec) {
                 Ok(stream) => stream,
                 Err(e) => {
-                    let _ = tx.send((task_id_clone, -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể thêm stream đầu ra: {}", e);
+                    let _ = tx.send((task_id_clone, -1.0)); // Signal error
+                    eprintln!("Cannot add output stream: {}", e);
                     return;
                 }
             };
 
-            // Tạo encoder context
+            // Create encoder context
             let encoder_ctx = codec::context::Context::new_with_codec(encoder_codec);
 
-            // Tạo encoder
+            // Create encoder
             let mut enc = match encoder_ctx.encoder().video() {
                 Ok(enc) => enc,
                 Err(e) => {
-                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể tạo video encoder: {}", e);
+                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Signal error
+                    eprintln!("Cannot create video encoder: {}", e);
                     return;
                 }
             };
 
-            // Thiết lập các tham số encoder
+            // Set encoder parameters
             let width = if let Some((w, _)) = task.options.resolution { w } else { decoder.width() };
             let height = if let Some((_, h)) = task.options.resolution { h } else { decoder.height() };
             let framerate = if let Some(fps) = task.options.framerate {
@@ -281,69 +281,69 @@ impl VideoProcessor {
                 decoder.frame_rate().unwrap_or(Rational::new(30, 1)) // Default to 30fps if not available
             };
 
-            // Đảm bảo kích thước là số chẵn (yêu cầu của một số encoder)
+            // Ensure dimensions are even (required by some encoders)
             let width = width - (width % 2);
             let height = height - (height % 2);
 
             enc.set_width(width);
             enc.set_height(height);
-            // Sử dụng pixel format phù hợp với encoder
-            enc.set_format(ffmpeg::format::pixel::Pixel::YUV420P); // Định dạng pixel phổ biến nhất
+            // Use pixel format compatible with encoder
+            enc.set_format(ffmpeg::format::pixel::Pixel::YUV420P); // Most common pixel format
             enc.set_time_base(Rational::new(1, 25));
-            enc.set_frame_rate(Some(Rational::new(25, 1))); // Sử dụng framerate ổn định 25fps
+            enc.set_frame_rate(Some(Rational::new(25, 1))); // Use stable framerate of 25fps
 
-            // Thiết lập các tham số codec
-            enc.set_max_b_frames(0); // Không sử dụng B-frames để tránh lỗi
-            enc.set_gop(25); // Thiết lập GOP size (1 giây với 25fps)
+            // Set codec parameters
+            enc.set_max_b_frames(0); // Don't use B-frames to avoid errors
+            enc.set_gop(25); // Set GOP size (1 second with 25fps)
 
-            // Thêm các tham số để tránh lỗi timestamp
+            // Add parameters to avoid timestamp errors
             enc.set_flags(ffmpeg::codec::flag::Flags::GLOBAL_HEADER);
-            output_stream.set_time_base(Rational::new(1, 25000)); // Timebase chi tiết hơn
+            output_stream.set_time_base(Rational::new(1, 25000)); // More detailed timebase
 
             if let Some(bitrate) = task.options.bitrate {
-                // Chuyển đổi bitrate từ u64 sang usize
+                // Convert bitrate from u64 to usize
                 let bitrate_usize = bitrate.try_into().unwrap_or(0);
                 enc.set_bit_rate(bitrate_usize);
             }
 
-            // Thiết lập parameters cho output stream
+            // Set parameters for output stream
             output_stream.set_parameters(&enc);
 
-            // Mở encoder
+            // Open encoder
             let mut enc = match enc.open_as(encoder_codec) {
                 Ok(enc) => enc,
                 Err(e) => {
-                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể mở encoder: {}", e);
+                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Signal error
+                    eprintln!("Cannot open encoder: {}", e);
                     return;
                 }
             };
 
-            // Thiết lập time base cho output stream
+            // Set time base for output stream
             let output_time_base = output_stream.time_base();
 
-            // Tạo scaler để chuyển đổi định dạng frame nếu cần
+            // Create scaler to convert frame format if needed
             let mut scaler = match ScalingContext::get(
                 decoder.format(),
                 decoder.width(),
                 decoder.height(),
-                ffmpeg::format::pixel::Pixel::YUV420P, // Đảm bảo định dạng pixel đầu ra là YUV420P
+                ffmpeg::format::pixel::Pixel::YUV420P, // Ensure output pixel format is YUV420P
                 width,
                 height,
                 ScalingFlags::BILINEAR,
             ) {
                 Ok(s) => s,
                 Err(e) => {
-                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Báo hiệu lỗi
-                    eprintln!("Không thể tạo scaler: {}", e);
+                    let _ = tx.send((task_id_clone.clone(), -1.0)); // Signal error
+                    eprintln!("Cannot create scaler: {}", e);
                     return;
                 }
             };
 
-            // Ghi header cho tệp đầu ra
+            // Write header for output file
             if let Err(e) = output_ctx.write_header() {
-                let _ = tx.send((task_id_clone.clone(), -1.0)); // Báo hiệu lỗi
-                eprintln!("Không thể ghi header: {}", e);
+                let _ = tx.send((task_id_clone.clone(), -1.0)); // Signal error
+                eprintln!("Cannot write header: {}", e);
                 return;
             }
 
@@ -352,59 +352,59 @@ impl VideoProcessor {
             let mut frame_count = 0;
             let mut total_frames = 0;
 
-            // Ước tính tổng số frame
+            // Estimate total frames
             if input_ctx.duration() > 0 && framerate.numerator() > 0 {
                 total_frames = (input_ctx.duration() as f64 / f64::from(ffmpeg::ffi::AV_TIME_BASE) * framerate.numerator() as f64 / framerate.denominator() as f64) as i32;
             }
 
-            // Xử lý từng packet
+            // Process each packet
             for (stream, packet) in input_ctx.packets() {
                 if stream.index() == input_stream_index {
-                    // Gửi packet đến decoder
+                    // Send packet to decoder
                     if let Err(e) = decoder.send_packet(&packet) {
-                        eprintln!("Lỗi khi gửi packet đến decoder: {}", e);
+                        eprintln!("Error sending packet to decoder: {}", e);
                         continue;
                     }
 
-                    // Nhận các frame đã giải mã
+                    // Receive decoded frames
                     while decoder.receive_frame(&mut decoded_frame).is_ok() {
                         frame_count += 1;
 
-                        // Scale frame nếu cần
+                        // Scale frame if needed
                         if let Err(e) = scaler.run(&decoded_frame, &mut scaled_frame) {
-                            eprintln!("Lỗi khi scale frame: {}", e);
+                            eprintln!("Error scaling frame: {}", e);
                             continue;
                         }
 
-                        // Thiết lập timestamp cho frame với giá trị tăng dần
-                        // Sử dụng frame_count * 1000 để đảm bảo không có timestamp trùng lặp
+                        // Set timestamp for frame with incremental value
+                        // Use frame_count * 1000 to ensure no duplicate timestamps
                         scaled_frame.set_pts(Some(frame_count * 1000));
                         scaled_frame.set_kind(decoded_frame.kind());
 
-                        // Gửi frame đến encoder
+                        // Send frame to encoder
                         if let Err(e) = enc.send_frame(&scaled_frame) {
-                            eprintln!("Lỗi khi gửi frame đến encoder: {}", e);
+                            eprintln!("Error sending frame to encoder: {}", e);
                             continue;
                         }
 
-                        // Nhận các packet đã mã hóa
+                        // Receive encoded packets
                         let mut encoded_packet = ffmpeg::Packet::empty();
                         while enc.receive_packet(&mut encoded_packet).is_ok() {
-                            // Thiết lập stream index và rescale timestamp
+                            // Set stream index and rescale timestamp
                             encoded_packet.set_stream(0);
                             encoded_packet.rescale_ts(input_time_base, output_time_base);
 
-                            // Ghi packet vào tệp đầu ra
+                            // Write packet to output file
                             if let Err(e) = encoded_packet.write_interleaved(&mut output_ctx) {
-                                eprintln!("Lỗi khi ghi packet: {}", e);
+                                eprintln!("Error writing packet: {}", e);
                             }
                         }
 
-                        // Cập nhật tiến độ
+                        // Update progress
                         if total_frames > 0 {
                             let progress = (frame_count as f32 / total_frames as f32) * 100.0;
 
-                            // Gửi tiến độ qua channel
+                            // Send progress through channel
                             let _ = tx.send((task_id_clone.clone(), progress));
                         }
                     }
@@ -413,83 +413,83 @@ impl VideoProcessor {
 
             // Flush decoder
             if let Err(e) = decoder.send_eof() {
-                eprintln!("Lỗi khi gửi EOF đến decoder: {}", e);
+                eprintln!("Error sending EOF to decoder: {}", e);
             }
 
-            // Nhận các frame còn lại từ decoder
+            // Receive remaining frames from decoder
             while decoder.receive_frame(&mut decoded_frame).is_ok() {
-                // Scale frame nếu cần
+                // Scale frame if needed
                 if let Err(e) = scaler.run(&decoded_frame, &mut scaled_frame) {
-                    eprintln!("Lỗi khi scale frame: {}", e);
+                    eprintln!("Error scaling frame: {}", e);
                     continue;
                 }
 
-                // Thiết lập timestamp cho frame với giá trị tăng dần
-                frame_count += 1; // Tăng frame_count để tránh timestamp trùng lặp
+                // Set timestamp for frame with incremental value
+                frame_count += 1; // Increase frame_count to avoid duplicate timestamps
                 scaled_frame.set_pts(Some(frame_count * 1000));
                 scaled_frame.set_kind(decoded_frame.kind());
 
-                // Gửi frame đến encoder
+                // Send frame to encoder
                 if let Err(e) = enc.send_frame(&scaled_frame) {
-                    eprintln!("Lỗi khi gửi frame đến encoder: {}", e);
+                    eprintln!("Error sending frame to encoder: {}", e);
                     continue;
                 }
 
-                // Nhận các packet đã mã hóa
+                // Receive encoded packets
                 let mut encoded_packet = ffmpeg::Packet::empty();
                 while enc.receive_packet(&mut encoded_packet).is_ok() {
-                    // Thiết lập stream index và rescale timestamp
+                    // Set stream index and rescale timestamp
                     encoded_packet.set_stream(0);
                     encoded_packet.rescale_ts(input_time_base, output_time_base);
 
-                    // Ghi packet vào tệp đầu ra
+                    // Write packet to output file
                     if let Err(e) = encoded_packet.write_interleaved(&mut output_ctx) {
-                        eprintln!("Lỗi khi ghi packet: {}", e);
+                        eprintln!("Error writing packet: {}", e);
                     }
                 }
             }
 
             // Flush encoder
             if let Err(e) = enc.send_eof() {
-                eprintln!("Lỗi khi gửi EOF đến encoder: {}", e);
+                eprintln!("Error sending EOF to encoder: {}", e);
             }
 
-            // Nhận các packet còn lại từ encoder
+            // Receive remaining packets from encoder
             let mut encoded_packet = ffmpeg::Packet::empty();
             while enc.receive_packet(&mut encoded_packet).is_ok() {
-                // Thiết lập stream index và rescale timestamp
+                // Set stream index and rescale timestamp
                 encoded_packet.set_stream(0);
                 encoded_packet.rescale_ts(input_time_base, output_time_base);
 
-                // Ghi packet vào tệp đầu ra
+                // Write packet to output file
                 if let Err(e) = encoded_packet.write_interleaved(&mut output_ctx) {
-                    eprintln!("Lỗi khi ghi packet: {}", e);
+                    eprintln!("Error writing packet: {}", e);
                 }
             }
 
-            // Ghi trailer cho tệp đầu ra
+            // Write trailer for output file
             if let Err(e) = output_ctx.write_trailer() {
-                let _ = tx.send((task_id_clone.clone(), -1.0)); // Báo hiệu lỗi
-                eprintln!("Không thể ghi trailer: {}", e);
+                let _ = tx.send((task_id_clone.clone(), -1.0)); // Signal error
+                eprintln!("Cannot write trailer: {}", e);
                 return;
             }
 
-            // Báo hiệu hoàn thành
+            // Signal completion
             let _ = tx.send((task_id_clone.clone(), 100.0));
         });
 
         Ok(())
     }
 
-    /// Kiểm tra tiến độ của các tác vụ
+    /// Check progress of tasks
     pub fn check_progress(&mut self) -> Vec<(String, ProcessingStatus)> {
         if let Some((_, ref rx)) = self.progress_channel {
-            // Nhận tất cả các cập nhật tiến độ hiện có
+            // Receive all available progress updates
             while let Ok((task_id, progress)) = rx.try_recv() {
                 if let Some(task) = self.tasks.iter_mut().find(|t| t.id == task_id) {
                     if progress < 0.0 {
                         task.status =
-                            ProcessingStatus::Failed("Lỗi trong quá trình xử lý".to_string());
+                            ProcessingStatus::Failed("Error during processing".to_string());
                     } else if progress >= 100.0 {
                         task.status = ProcessingStatus::Complete;
                     } else {
@@ -499,19 +499,19 @@ impl VideoProcessor {
             }
         }
 
-        // Trả về trạng thái hiện tại của tất cả các tác vụ
+        // Return the current status of all tasks
         self.tasks
             .iter()
             .map(|task| (task.id.clone(), task.status.clone()))
             .collect()
     }
 
-    /// Lấy thông tin về một tác vụ
+    /// Get information about a task
     pub fn get_task(&self, task_id: &str) -> Option<&ProcessingTask> {
         self.tasks.iter().find(|t| t.id == task_id)
     }
 
-    /// Lấy danh sách tất cả các tác vụ
+    /// Get list of all tasks
     pub fn get_tasks(&self) -> &[ProcessingTask] {
         &self.tasks
     }

@@ -16,12 +16,12 @@ export function Footer() {
   const { appState } = useAppState();
   const menuRef = useRef<Menu>(null);
 
-  // Lấy GPU được chọn từ global state
+  // Get selected GPU from global state
   const selectedGpuIndex = appState?.selected_gpu_index ?? -1;
   const selectedGpu = selectedGpuIndex >= 0 && appState?.gpus ?
     appState.gpus[selectedGpuIndex] : null;
 
-  // Hàm để cập nhật GPU được chọn
+  // Function to update selected GPU
   const updateSelectedGpu = async (index: number) => {
     try {
       await invoke('set_selected_gpu', { gpuIndex: index });

@@ -8,14 +8,14 @@ interface GlobalStateProviderProps {
 }
 
 export function GlobalStateProvider({ children }: GlobalStateProviderProps) {
-  // Lấy các hàm fetch state từ các store
+  // Get fetch state functions from stores
   const fetchAppState = useAppStore(state => state.fetchAppState);
   const fetchConversionState = useConversionStore(state => state.fetchConversionState);
   const fetchPreferencesState = usePreferencesStore(state => state.fetchPreferencesState);
 
-  // Khởi tạo state khi component mount
+  // Initialize state when component mounts
   useEffect(() => {
-    // Fetch tất cả các state
+    // Fetch all states
     Promise.all([
       fetchAppState(),
       fetchConversionState(),

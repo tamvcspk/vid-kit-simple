@@ -1,6 +1,5 @@
 import React from 'react';
-import { Message } from 'primereact/message';
-import { formatErrorForUser } from '../../../../utils/errorUtils';
+import { ErrorDisplay } from '../../../../components/common';
 import { ConversionFormProps } from './types';
 import { SettingsPanelContainer } from './ConversionForm.styles';
 
@@ -13,10 +12,10 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({
     <SettingsPanelContainer>
       {/* Error message */}
       {error && (
-        <Message
-          severity="error"
-          text={formatErrorForUser(error)}
-          style={{ width: '100%', marginBottom: '1rem' }}
+        <ErrorDisplay
+          error={error}
+          showDetails={true}
+          style={{ marginBottom: '1rem' }}
         />
       )}
 

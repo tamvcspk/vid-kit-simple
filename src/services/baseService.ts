@@ -1,4 +1,4 @@
-import { AppError, ErrorCategory, createError, logError, categorizeError } from '../utils';
+import { AppError, ErrorCategory, BackendErrorInfo, createError, logError, categorizeError, handleBackendError } from '../utils';
 
 /**
  * Base service class with standardized error handling
@@ -32,6 +32,11 @@ export abstract class BaseService {
     // If it's already an AppError, return it
     if (typeof error === 'object' && error !== null && 'category' in error && 'message' in error) {
       return error as AppError;
+    }
+
+    // Check if it's a backend error with code
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+      return handleBackendError(error);
     }
 
     // Try to categorize the error

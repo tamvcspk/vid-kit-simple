@@ -1,4 +1,4 @@
-# Các thư mục được tạo ra trong quá trình build
+# Directories generated during build
 dist
 build
 node_modules
@@ -9,7 +9,7 @@ public
 target
 third_party
 
-# Các file cụ thể không cần định dạng
+# Specific files that don't need formatting
 package-lock.json
 Cargo.lock
 *.lock
@@ -17,4 +17,4 @@ Cargo.lock
 *.md
 *.json.br
 *.wasm
-*.rlib 
+*.rlib

@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { UserPreferencesState } from '../types/state.types';
 
-// Định nghĩa interface cho PreferencesStore
+// Define interface for PreferencesStore
 interface PreferencesStore {
   // State
   data: UserPreferencesState | null;
@@ -19,18 +19,18 @@ interface PreferencesStore {
   loadPreferencesFromFile: () => Promise<void>;
 }
 
-// Tạo store với devtools middleware
+// Create store with devtools middleware
 const usePreferencesStore = create<PreferencesStore>()(
   devtools(
     (set) => ({
-      // State ban đầu
+      // Initial state
       data: null,
       isLoading: true,
       error: null,
 
       // Actions
       setPreferencesState: (preferencesState) => set({ data: preferencesState }),
-      
+
       fetchPreferencesState: async () => {
         try {
           set({ isLoading: true });
@@ -42,16 +42,16 @@ const usePreferencesStore = create<PreferencesStore>()(
           set({ isLoading: false });
         }
       },
-      
+
       updatePreferences: async (preferences) => {
         try {
           await invoke('update_preferences', { newPreferences: preferences });
-          // State sẽ được cập nhật thông qua event listener
+          // State will be updated through event listener
         } catch (error) {
           set({ error: `Failed to update preferences: ${error}` });
         }
       },
-      
+
       savePreferencesToFile: async () => {
         try {
           await invoke('save_preferences_to_file');
@@ -59,11 +59,11 @@ const usePreferencesStore = create<PreferencesStore>()(
           set({ error: `Failed to save preferences to file: ${error}` });
         }
       },
-      
+
       loadPreferencesFromFile: async () => {
         try {
           await invoke('load_preferences_from_file');
-          // State sẽ được cập nhật thông qua event listener
+          // State will be updated through event listener
         } catch (error) {
           set({ error: `Failed to load preferences from file: ${error}` });
         }
@@ -73,7 +73,7 @@ const usePreferencesStore = create<PreferencesStore>()(
   )
 );
 
-// Thiết lập listener cho sự kiện preferences-changed
+// Set up listener for preferences-changed event
 listen<UserPreferencesState>('preferences-changed', (event) => {
   usePreferencesStore.setState({ data: event.payload });
 }).catch(console.error);

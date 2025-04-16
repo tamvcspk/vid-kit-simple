@@ -6,7 +6,6 @@ import { StateProviders } from './context/StateProviders';
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-  // Khởi tạo ứng dụng
 });
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

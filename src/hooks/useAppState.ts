@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import useAppStore from "../store/app-state";
 
 /**
- * Hook tùy chỉnh để sử dụng AppStore
- * Tự động fetch app state khi component mount
+ * Custom hook to use AppStore
+ * Automatically fetches app state when component mounts
  */
 export function useAppState() {
   const {
@@ -14,7 +14,7 @@ export function useAppState() {
     setSelectedGpu
   } = useAppStore();
 
-  // Fetch app state khi component mount
+  // Fetch app state when component mounts
   useEffect(() => {
     fetchAppState();
   }, [fetchAppState]);

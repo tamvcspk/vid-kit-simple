@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { GlobalStateProvider } from './GlobalStateProvider';
 
-// Component kết hợp tất cả các provider
+// Component combines all providers
 export function StateProviders({ children }: { children: ReactNode }) {
   return (
     <GlobalStateProvider>

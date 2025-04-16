@@ -151,13 +151,13 @@ const ConvertView: React.FC = () => {
   // Handle browse output
   const handleBrowseOutput = async () => {
     try {
-      // Chọn thư mục đầu ra
+      // Select output directory
       const selectedDir = await videoService.selectDirectory();
       if (selectedDir) {
-        // Tạo tên file mặc định dựa trên tên file đầu vào
+        // Create default filename based on input filename
         let defaultFileName = 'output_converted';
 
-        // Nếu đã chọn file đầu vào, sử dụng tên của nó làm cơ sở
+        // If input file is selected, use its name as the base
         const selectedFileObj = files.find(f => f.id === selectedFile);
         if (selectedFileObj && selectedFileObj.name) {
           const fileNameWithoutExt = selectedFileObj.name.split('.')[0];
@@ -166,8 +166,8 @@ const ConvertView: React.FC = () => {
           }
         }
 
-        // Tạo đường dẫn đầy đủ với tên file mặc định
-        // Bao gồm phần mở rộng tương ứng với định dạng đầu ra
+        // Create full path with default filename
+        // Include extension corresponding to the output format
         const fullPath = `${selectedDir}/${defaultFileName}.${outputFormat}`;
         setOutputPath(fullPath);
       }

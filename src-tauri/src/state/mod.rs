@@ -2,10 +2,10 @@ use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
 use tauri::{Manager, State, AppHandle, Emitter};
 
-// Thông tin về GPU
+// GPU information
 use crate::utils::gpu_detector::GpuInfo;
 
-// Định nghĩa các loại state khác nhau
+// Define different types of state
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppState {
     pub is_initialized: bool,
@@ -13,10 +13,10 @@ pub struct AppState {
     pub ffmpeg_version: Option<String>,
     pub gpu_available: bool,
     pub gpus: Vec<GpuInfo>,
-    pub selected_gpu_index: i32, // -1 cho CPU, 0+ cho GPU
+    pub selected_gpu_index: i32, // -1 for CPU, 0+ for GPU
 }
 
-// Thông tin về file video
+// Video file information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileInfo {
     pub id: String,
@@ -47,7 +47,7 @@ pub struct UserPreferencesState {
     pub theme: String,
 }
 
-// GlobalState kết hợp tất cả các state để trả về cho frontend
+// GlobalState combines all states to return to frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalState {
     pub app: AppState,
@@ -55,14 +55,14 @@ pub struct GlobalState {
     pub preferences: UserPreferencesState,
 }
 
-// Struct chính để quản lý tất cả state
+// Main struct to manage all states
 pub struct StateManager {
     pub app: Mutex<AppState>,
     pub conversion: Mutex<ConversionState>,
     pub preferences: Mutex<UserPreferencesState>,
 }
 
-// Các hàm để khởi tạo state
+// Functions to initialize state
 impl StateManager {
     pub fn new() -> Self {
         Self {
@@ -72,7 +72,7 @@ impl StateManager {
                 ffmpeg_version: None,
                 gpu_available: false,
                 gpus: Vec::new(),
-                selected_gpu_index: -1, // Mặc định là CPU
+                selected_gpu_index: -1, // Default is CPU
             }),
             conversion: Mutex::new(ConversionState {
                 active_tasks: Vec::new(),
@@ -91,7 +91,7 @@ impl StateManager {
         }
     }
 
-    // Khởi tạo state với các giá trị mặc định
+    // Initialize state with default values
     pub fn initialize(&self, ffmpeg_version: Option<String>, gpu_available: bool, gpus: Vec<GpuInfo>) {
         let mut app = self.app.lock().unwrap();
         app.is_initialized = true;
@@ -99,7 +99,7 @@ impl StateManager {
         app.gpu_available = gpu_available;
         app.gpus = gpus;
 
-        // Nếu có GPU khả dụng, chọn GPU đầu tiên có sẵn
+        // If GPU is available, select the first available GPU
         if gpu_available {
             for (i, gpu) in app.gpus.iter().enumerate() {
                 if gpu.is_available {
@@ -108,12 +108,12 @@ impl StateManager {
                 }
             }
         } else {
-            app.selected_gpu_index = -1; // Sử dụng CPU nếu không có GPU
+            app.selected_gpu_index = -1; // Use CPU if no GPU is available
         }
     }
 }
 
-// Các hàm truy cập state
+// State access functions
 
 pub fn get_app_state(state_manager: State<'_, StateManager>) -> Result<AppState, String> {
     let lock_result = state_manager.app.lock();
@@ -131,11 +131,11 @@ pub fn set_selected_gpu(
     let lock_result = state_manager.app.lock();
     let result = match lock_result {
         Ok(mut app_state) => {
-            // Kiểm tra xem index có hợp lệ không
+            // Check if the index is valid
             if gpu_index == -1 || (gpu_index >= 0 && (gpu_index as usize) < app_state.gpus.len()) {
                 app_state.selected_gpu_index = gpu_index;
 
-                // Emit sự kiện thông báo state đã thay đổi
+                // Emit event to notify state has changed
                 let _ = app_handle.emit("app-state-changed", app_state.clone());
 
                 Ok(())
@@ -173,7 +173,7 @@ pub fn update_preferences(
         Ok(mut preferences) => {
             *preferences = new_preferences.clone();
 
-            // Emit sự kiện thông báo preferences đã thay đổi
+            // Emit event to notify preferences have changed
             // let _ = app_handle.emit("preferences-changed", new_preferences);
 
             Ok(())
@@ -192,10 +192,10 @@ pub fn update_conversion_progress(
     let lock_result = state.conversion.lock();
     let result = match lock_result {
         Ok(mut conversion) => {
-            // Cập nhật tiến độ cho task hiện tại
+            // Update progress for current task
             conversion.current_progress = progress;
 
-            // Nếu hoàn thành, chuyển task từ active sang completed
+            // If completed, move task from active to completed
             if progress >= 100.0 {
                 if let Some(pos) = conversion.active_tasks.iter().position(|id| id == &task_id) {
                     conversion.active_tasks.remove(pos);
@@ -203,7 +203,7 @@ pub fn update_conversion_progress(
                 }
             }
 
-            // Emit sự kiện cho frontend
+            // Emit event for frontend
             #[derive(Serialize, Clone)]
             struct Progress {
                 task_id: String,
@@ -215,10 +215,10 @@ pub fn update_conversion_progress(
                 progress,
             };
 
-            // Emit sự kiện cập nhật tiến độ
+            // Emit progress update event
             let _ = app_handle.emit("conversion-progress", progress_data);
 
-            // Emit sự kiện thông báo conversion state đã thay đổi
+            // Emit event to notify conversion state has changed
             let _ = app_handle.emit("conversion-state-changed", conversion.clone());
 
             Ok(())
@@ -239,7 +239,7 @@ pub fn add_conversion_task(
             conversion.active_tasks.push(task_id);
             conversion.current_progress = 0.0;
 
-            // Emit sự kiện thông báo conversion state đã thay đổi
+            // Emit event to notify conversion state has changed
             let _ = app_handle.emit("conversion-state-changed", conversion.clone());
 
             Ok(())
@@ -262,7 +262,7 @@ pub fn mark_task_failed(
                 conversion.failed_tasks.push(task_id);
             }
 
-            // Emit sự kiện thông báo conversion state đã thay đổi
+            // Emit event to notify conversion state has changed
             let _ = app_handle.emit("conversion-state-changed", conversion.clone());
 
             Ok(())
@@ -281,17 +281,17 @@ pub fn add_file_to_list(
     let lock_result = state_manager.conversion.lock();
     let result = match lock_result {
         Ok(mut conversion) => {
-            // Kiểm tra xem file đã tồn tại trong danh sách chưa
+            // Check if the file already exists in the list
             if !conversion.files.iter().any(|f| f.path == file_info.path) {
                 conversion.files.push(file_info);
 
-                // Nếu chưa có file nào được chọn, chọn file đầu tiên
+                // If no file is selected, select the first one
                 if conversion.selected_file_id.is_none() && !conversion.files.is_empty() {
                     conversion.selected_file_id = Some(conversion.files[0].id.clone());
                 }
             }
 
-            // Emit sự kiện thông báo conversion state đã thay đổi
+            // Emit event to notify conversion state has changed
             let _ = app_handle.emit("conversion-state-changed", conversion.clone());
 
             Ok(())
@@ -309,13 +309,13 @@ pub fn remove_file_from_list(
     let lock_result = state_manager.conversion.lock();
     let result = match lock_result {
         Ok(mut conversion) => {
-            // Tìm vị trí của file trong danh sách
+            // Find the position of the file in the list
             if let Some(index) = conversion.files.iter().position(|f| f.id == file_id) {
                 conversion.files.remove(index);
 
-                // Nếu file bị xóa là file đang được chọn
+                // If the deleted file is the currently selected file
                 if conversion.selected_file_id.as_ref() == Some(&file_id) {
-                    // Chọn file đầu tiên trong danh sách nếu còn file nào
+                    // Select the first file in the list if any files remain
                     conversion.selected_file_id = if !conversion.files.is_empty() {
                         Some(conversion.files[0].id.clone())
                     } else {
@@ -324,7 +324,7 @@ pub fn remove_file_from_list(
                 }
             }
 
-            // Emit sự kiện thông báo conversion state đã thay đổi
+            // Emit event to notify conversion state has changed
             let _ = app_handle.emit("conversion-state-changed", conversion.clone());
 
             Ok(())
@@ -344,7 +344,7 @@ pub fn select_file(
         Ok(mut conversion) => {
             match file_id {
                 Some(id) => {
-                    // Kiểm tra xem file có tồn tại trong danh sách không
+                    // Check if the file exists in the list
                     if conversion.files.iter().any(|f| f.id == id) {
                         conversion.selected_file_id = Some(id);
                     } else {
@@ -356,7 +356,7 @@ pub fn select_file(
                 }
             }
 
-            // Emit sự kiện thông báo conversion state đã thay đổi
+            // Emit event to notify conversion state has changed
             let _ = app_handle.emit("conversion-state-changed", conversion.clone());
 
             Ok(())
@@ -376,7 +376,7 @@ pub fn clear_file_list(
             conversion.files.clear();
             conversion.selected_file_id = None;
 
-            // Emit sự kiện thông báo conversion state đã thay đổi
+            // Emit event to notify conversion state has changed
             let _ = app_handle.emit("conversion-state-changed", conversion.clone());
 
             Ok(())
@@ -394,19 +394,19 @@ pub fn save_preferences_to_file(app_handle: AppHandle) -> Result<(), String> {
     let preferences_json = serde_json::to_string_pretty(&*preferences)
         .map_err(|e| format!("Failed to serialize preferences: {}", e))?;
 
-    // Lấy đường dẫn đến thư mục cấu hình
+    // Get path to configuration directory
     let app_dir = app_handle.path().app_data_dir()
         .map_err(|_| "Failed to get app directory".to_string())?;
 
     let config_file = app_dir.join("preferences.json");
 
-    // Đảm bảo thư mục tồn tại
+    // Ensure directory exists
     if let Some(parent) = config_file.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
     }
 
-    // Lưu file
+    // Save file
     std::fs::write(config_file, preferences_json)
         .map_err(|e| format!("Failed to write preferences file: {}", e))?;
 
@@ -414,18 +414,18 @@ pub fn save_preferences_to_file(app_handle: AppHandle) -> Result<(), String> {
 }
 
 pub fn load_preferences_from_file(app_handle: AppHandle) -> Result<(), String> {
-    // Lấy đường dẫn đến thư mục cấu hình
+    // Get path to configuration directory
     let app_dir = app_handle.path().app_data_dir()
         .map_err(|_| "Failed to get app directory".to_string())?;
 
     let config_file = app_dir.join("preferences.json");
 
-    // Kiểm tra xem file có tồn tại không
+    // Check if file exists
     if !config_file.exists() {
         return Ok(());
     }
 
-    // Đọc file
+    // Read file
     let preferences_json = std::fs::read_to_string(config_file)
         .map_err(|e| format!("Failed to read preferences file: {}", e))?;
 
@@ -433,13 +433,13 @@ pub fn load_preferences_from_file(app_handle: AppHandle) -> Result<(), String> {
     let loaded_preferences: UserPreferencesState = serde_json::from_str(&preferences_json)
         .map_err(|e| format!("Failed to parse preferences: {}", e))?;
 
-    // Cập nhật state
+    // Update state
     let state = app_handle.state::<StateManager>();
     let preferences_lock = state.preferences.lock();
     let mut preferences = preferences_lock.map_err(|_| "Failed to acquire preferences lock".to_string())?;
     *preferences = loaded_preferences.clone();
 
-    // Emit sự kiện thông báo preferences đã thay đổi
+    // Emit event to notify preferences have changed
     let _ = app_handle.emit("preferences-changed", loaded_preferences);
 
     Ok(())

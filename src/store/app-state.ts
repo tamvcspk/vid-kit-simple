@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { AppState } from '../types/state.types';
 
-// Định nghĩa interface cho AppStore
+// Define interface for AppStore
 interface AppStore {
   // State
   data: AppState | null;
@@ -17,22 +17,22 @@ interface AppStore {
   fetchAppState: () => Promise<void>;
 }
 
-// Tạo store với devtools middleware
+// Create store with devtools middleware
 const useAppStore = create<AppStore>()(
   devtools(
     (set) => ({
-      // State ban đầu
+      // Initial state
       data: null,
       isLoading: true,
       error: null,
 
       // Actions
       setAppState: (appState) => set({ data: appState }),
-      
+
       setSelectedGpu: async (gpuIndex) => {
         try {
           await invoke('set_selected_gpu', { gpuIndex });
-          // State sẽ được cập nhật thông qua event listener
+          // State will be updated through event listener
         } catch (error) {
           set({ error: `Failed to set selected GPU: ${error}` });
         }
@@ -54,7 +54,7 @@ const useAppStore = create<AppStore>()(
   )
 );
 
-// Thiết lập listener cho sự kiện app-state-changed
+// Set up listener for app-state-changed event
 listen<AppState>('app-state-changed', (event) => {
   useAppStore.setState({ data: event.payload });
 }).catch(console.error);

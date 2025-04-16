@@ -67,7 +67,7 @@ export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>)
   const addFileToList = async (filePath: string, fileName: string, fileSize: number, fileType: string) => {
     const id = crypto.randomUUID();
 
-    // Thêm file vào global state
+    // Add file to global state
     await invoke('add_file_to_list', {
       id,
       name: fileName,
@@ -79,7 +79,7 @@ export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>)
       thumbnail: null
     });
 
-    // Load thông tin video
+    // Load video information
     await loadVideoInfo(filePath);
   };
 
@@ -122,7 +122,7 @@ export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>)
 
   // Remove file from list
   const handleFileRemove = async (file: FileItemData) => {
-    // Xóa file khỏi global state
+    // Remove file from global state
     await invoke('remove_file_from_list', { fileId: file.id });
   };
 

@@ -18,11 +18,11 @@ pub struct GpuList {
 
 #[tauri::command]
 pub fn check_gpu_availability() -> Result<GpuList, String> {
-    // Tạo instance Vulkan
+    // Create Vulkan instance
     let instance = back::Instance::create("VidKitSimple", 1)
         .map_err(|e| format!("Failed to create Vulkan instance: {}", e))?;
 
-    // Lấy danh sách adapter
+    // Get adapter list
     let adapters = instance.enumerate_adapters();
 
     if adapters.is_empty() {
@@ -38,7 +38,7 @@ pub fn check_gpu_availability() -> Result<GpuList, String> {
 
     let mut gpu_list = Vec::new();
 
-    // Lấy thông tin từ tất cả các adapter
+    // Get information from all adapters
     for adapter in adapters.iter() {
         let name = adapter.info.name.to_string();
         let vendor = match adapter.info.vendor {
@@ -48,7 +48,7 @@ pub fn check_gpu_availability() -> Result<GpuList, String> {
             _ => "Unknown",
         };
 
-        // Kiểm tra các codec được hỗ trợ
+        // Check supported codecs
         let mut supported_codecs = Vec::new();
 
         match vendor {

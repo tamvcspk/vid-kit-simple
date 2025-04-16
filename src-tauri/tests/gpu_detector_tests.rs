@@ -7,26 +7,26 @@ use vid_kit_simple_lib::utils::gpu_detector::{
 fn test_gpu_list_structure() {
     let result = check_gpu_availability();
 
-    // Đảm bảo kết quả là Ok
+    // Ensure the result is Ok
     assert!(result.is_ok(), "GPU check should return valid result");
 
     let gpu_list = result.unwrap();
 
-    // Đảm bảo danh sách GPU không rỗng
+    // Ensure the GPU list is not empty
     assert!(!gpu_list.gpus.is_empty(), "GPU list should not be empty");
 
-    // Kiểm tra mỗi GPU có thông tin hợp lệ
+    // Check that each GPU has valid information
     for gpu in gpu_list.gpus.iter() {
-        // Tên không được rỗng
+        // Name should not be empty
         assert!(!gpu.name.is_empty(), "GPU name should not be empty");
 
-        // Vendor không được rỗng
+        // Vendor should not be empty
         assert!(!gpu.vendor.is_empty(), "GPU vendor should not be empty");
 
-        // is_available phải là boolean (luôn đúng vì kiểu dữ liệu)
-        // supported_codecs phải là Vec (luôn đúng vì kiểu dữ liệu)
+        // is_available must be boolean (always true due to data type)
+        // supported_codecs must be Vec (always true due to data type)
 
-        // Nếu GPU available thì phải có ít nhất 1 codec
+        // If GPU is available, it must have at least 1 codec
         if gpu.is_available {
             assert!(
                 !gpu.supported_codecs.is_empty(),
@@ -36,25 +36,25 @@ fn test_gpu_list_structure() {
     }
 }
 
-// Test case cho hàm check_ffmpeg_codec
+// Test case for check_ffmpeg_codec function
 #[test]
 fn test_check_ffmpeg_codec() {
-    // Test với codec phổ biến
+    // Test with common codec
     let h264_result = check_ffmpeg_codec("libx264");
 
-    // Đây chỉ là kiểm tra cơ bản, kết quả phụ thuộc vào cài đặt FFmpeg trên máy
-    // Trong môi trường test thật, chúng ta nên mock kết quả này
+    // This is just a basic check, the result depends on the FFmpeg installation on the machine
+    // In a real test environment, we should mock this result
     println!("libx264 codec available: {}", h264_result);
 
-    // Test với codec không tồn tại
+    // Test with non-existent codec
     let fake_result = check_ffmpeg_codec("this_codec_does_not_exist");
     assert!(!fake_result, "Non-existent codec should return false");
 }
 
-// Test mock cho hàm check_gpu_availability
+// Mock test for check_gpu_availability function
 #[test]
 fn test_mock_gpu_list() {
-    // Mô phỏng kết quả từ GPU nếu chúng ta không có GPU thật để test
+    // Simulate results from GPU if we don't have a real GPU for testing
     let mock_gpu_list = GpuList {
         gpus: vec![
             GpuInfo {
@@ -72,7 +72,7 @@ fn test_mock_gpu_list() {
         ],
     };
 
-    // Kiểm tra cấu trúc của mock data
+    // Check the structure of mock data
     assert_eq!(
         mock_gpu_list.gpus.len(),
         2,

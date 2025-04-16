@@ -176,7 +176,7 @@ impl PresetManager {
         Ok(())
     }
 
-    // Helper để lấy đường dẫn file của preset
+    // Helper to get file path of preset
     fn get_preset_path(&self, id: &str) -> PathBuf {
         self.presets_dir.join(format!("{}.json", id))
     }

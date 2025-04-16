@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use crate::services::video_processor::{ProcessingOptions, VideoProcessor, VideoInfo};
 use crate::services::preset_manager::{ConversionPreset};
 use crate::state::StateManager;
+use crate::utils::error::{AppError, ErrorCode, ErrorInfo};
+use crate::handle_command;
 
 // Basic greeting command for testing
 #[tauri::command]
@@ -13,9 +15,9 @@ pub fn greet(name: &str) -> String {
 
 // Video processing commands
 #[tauri::command]
-pub fn get_video_info(path: String) -> Result<VideoInfo, String> {
+pub fn get_video_info(path: String) -> Result<VideoInfo, ErrorInfo> {
     let processor = VideoProcessor::new();
-    processor.get_video_info(&path)
+    handle_command!(processor.get_video_info(&path))
 }
 
 #[tauri::command]
@@ -23,9 +25,28 @@ pub fn create_processing_task(
     input_file: String,
     options: ProcessingOptions,
     processor_state: State<'_, ProcessorState>,
-) -> Result<String, String> {
-    let mut processor = processor_state.video_processor.lock().unwrap();
-    Ok(processor.create_task(&input_file, options))
+) -> Result<String, ErrorInfo> {
+    let result = match processor_state.video_processor.lock() {
+        Ok(mut processor) => {
+            // create_task returns a String directly, not a Result
+            let task_id = processor.create_task(&input_file, options);
+            Ok(task_id)
+        },
+        Err(e) => Err(AppError::state_error(
+            format!("Failed to lock processor state: {}", e),
+            ErrorCode::StateAccessError,
+            None
+        ))
+    };
+
+    // Convert the result to the expected return type
+    match result {
+        Ok(val) => Ok(val),
+        Err(err) => {
+            err.log();
+            Err(err.to_error_info())
+        }
+    }
 }
 
 #[tauri::command]
@@ -33,30 +54,62 @@ pub fn run_processing_task(
     task_id: String,
     processor_state: State<'_, ProcessorState>,
     app_handle: AppHandle
-) -> Result<(), String> {
-    // Lấy VideoProcessor từ state
-    let mut processor = processor_state.video_processor.lock().unwrap();
+) -> Result<(), ErrorInfo> {
+    // Get VideoProcessor from state
+    let result = match processor_state.video_processor.lock() {
+        Ok(mut processor) => {
+            // Run the task and handle errors
+            match processor.run_task(&task_id) {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    // Mark the task as failed in the state manager
+                    let _ = crate::state::mark_task_failed(task_id.clone(), app_handle.clone());
+                    Err(AppError::video_error(e, ErrorCode::VideoProcessingFailed, Some(format!("Task ID: {}", task_id))))
+                }
+            }
+        },
+        Err(e) => Err(AppError::state_error(
+            format!("Failed to lock processor state: {}", e),
+            ErrorCode::StateAccessError,
+            None
+        ))
+    };
 
-    // Chạy task và bắt lỗi nếu có
-    match processor.run_task(&task_id) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            // Đánh dấu task là thất bại trong state manager
-            let _ = crate::state::mark_task_failed(task_id, app_handle);
-            Err(e)
+    // Convert the result to the expected return type
+    match result {
+        Ok(val) => Ok(val),
+        Err(err) => {
+            err.log();
+            Err(err.to_error_info())
         }
     }
 }
 
 // Preset management commands
 #[tauri::command]
-pub fn list_presets(app_handle: AppHandle) -> Result<Vec<ConversionPreset>, String> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle) {
-        Ok(manager) => manager,
-        Err(e) => return Err(format!("Failed to create preset manager: {}", e)),
+pub fn list_presets(app_handle: AppHandle) -> Result<Vec<ConversionPreset>, ErrorInfo> {
+    let result = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle) {
+        Ok(manager) => {
+            match manager.list_presets() {
+                Ok(presets) => Ok(presets),
+                Err(e) => Err(AppError::preset_error(e.to_string(), ErrorCode::PresetNotFound, None))
+            }
+        },
+        Err(e) => Err(AppError::preset_error(
+            format!("Failed to create preset manager: {}", e),
+            ErrorCode::PresetValidationError,
+            None
+        ))
     };
 
-    manager.list_presets().map_err(|e| e.to_string())
+    // Convert the result to the expected return type
+    match result {
+        Ok(val) => Ok(val),
+        Err(err) => {
+            err.log();
+            Err(err.to_error_info())
+        }
+    }
 }
 
 #[tauri::command]
@@ -171,24 +224,34 @@ pub fn add_file_to_list(
     name: String,
     path: String,
     size: u64,
-    fileType: String,
+    file_type: String,
     duration: Option<f64>,
     resolution: Option<(u32, u32)>,
     thumbnail: Option<String>,
     state_manager: State<'_, StateManager>,
     app_handle: AppHandle,
-) -> Result<(), String> {
+) -> Result<(), ErrorInfo> {
     let file_info = crate::state::FileInfo {
         id,
         name,
         path,
         size,
-        file_type: fileType,
+        file_type,
         duration,
         resolution,
         thumbnail,
     };
-    crate::state::add_file_to_list(file_info, state_manager, app_handle)
+
+    let result = crate::state::add_file_to_list(file_info, state_manager, app_handle)
+        .map_err(|e| AppError::state_error(e, ErrorCode::StateMutationError, None));
+
+    match result {
+        Ok(val) => Ok(val),
+        Err(err) => {
+            err.log();
+            Err(err.to_error_info())
+        }
+    }
 }
 
 #[tauri::command]

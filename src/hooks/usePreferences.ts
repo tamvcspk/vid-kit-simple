@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import useActualPreferencesStore from '../store/preferences-state';
 
 /**
- * Hook tùy chỉnh để sử dụng PreferencesStore
- * Tự động fetch preferences state khi component mount
+ * Custom hook to use PreferencesStore
+ * Automatically fetches preferences state when component mounts
  */
 export function usePreferences() {
   const {
@@ -16,7 +16,7 @@ export function usePreferences() {
     loadPreferencesFromFile
   } = useActualPreferencesStore();
 
-  // Fetch preferences state khi component mount
+  // Fetch preferences state when component mounts
   useEffect(() => {
     fetchPreferencesState();
   }, [fetchPreferencesState]);

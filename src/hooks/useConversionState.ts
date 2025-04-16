@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import useConversionStore from '../store/conversion-state';
 
 /**
- * Hook tùy chỉnh để sử dụng ConversionStore
- * Tự động fetch conversion state khi component mount
+ * Custom hook to use ConversionStore
+ * Automatically fetches conversion state when component mounts
  */
 export function useConversionState() {
   const {
@@ -19,7 +19,7 @@ export function useConversionState() {
     markTaskFailed
   } = useConversionStore();
 
-  // Fetch conversion state khi component mount
+  // Fetch conversion state when component mounts
   useEffect(() => {
     fetchConversionState();
   }, [fetchConversionState]);

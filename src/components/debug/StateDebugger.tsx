@@ -4,6 +4,8 @@ import { Dialog } from 'primereact/dialog';
 import useAppStore from '../../store/app-state';
 import useConversionStore from '../../store/conversion-state';
 import usePreferencesStore from '../../store/preferences-state';
+import { ErrorDisplay } from '../common';
+import { createError, ErrorCategory } from '../../utils';
 
 export function StateDebugger() {
   const [visible, setVisible] = useState(false);
@@ -40,15 +42,30 @@ export function StateDebugger() {
       >
         <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
           <h3>App State {appLoading && '(Loading...)'}</h3>
-          {appError && <div className="p-error">{appError}</div>}
+          {appError && (
+            <ErrorDisplay
+              error={createError(ErrorCategory.State, appError)}
+              showDismissButton={false}
+            />
+          )}
           <pre>{JSON.stringify(appState, null, 2)}</pre>
 
           <h3>Conversion State {conversionLoading && '(Loading...)'}</h3>
-          {conversionError && <div className="p-error">{conversionError}</div>}
+          {conversionError && (
+            <ErrorDisplay
+              error={createError(ErrorCategory.Task, conversionError)}
+              showDismissButton={false}
+            />
+          )}
           <pre>{JSON.stringify(conversionState, null, 2)}</pre>
 
           <h3>Preferences {preferencesLoading && '(Loading...)'}</h3>
-          {preferencesError && <div className="p-error">{preferencesError}</div>}
+          {preferencesError && (
+            <ErrorDisplay
+              error={createError(ErrorCategory.Other, preferencesError)}
+              showDismissButton={false}
+            />
+          )}
           <pre>{JSON.stringify(preferencesState, null, 2)}</pre>
         </div>
       </Dialog>
