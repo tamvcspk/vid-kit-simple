@@ -5,22 +5,7 @@ import styled from '@emotion/styled';
 import { VideoInfo } from '../../../../types';
 import { videoService } from '../../../../services';
 import { formatFileSize, formatDuration } from '../../../../utils/formatUtils';
-
-export interface FileItemData {
-  id: string;
-  name: string;
-  path: string;
-  size: number;
-  type: string;
-  videoInfo?: VideoInfo | null;
-}
-
-interface FileListItemProps {
-  file: FileItemData;
-  isSelected: boolean;
-  onSelect: (file: FileItemData) => void;
-  onRemove: (file: FileItemData) => void;
-}
+import { FileListItemProps } from './types';
 
 // Styled components
 const FileCard = styled(Card)`
@@ -108,14 +93,12 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   onSelect,
   onRemove
 }) => {
-  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(file.videoInfo || null);
-  const [isLoading, setIsLoading] = useState<boolean>(!file.videoInfo);
+  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Load video info if not already loaded
-    if (!file.videoInfo && !videoInfo) {
-      loadVideoInfo();
-    }
+    loadVideoInfo();
   }, [file.path]);
 
   const loadVideoInfo = async () => {
@@ -123,8 +106,6 @@ export const FileListItem: React.FC<FileListItemProps> = ({
     try {
       const info = await videoService.getVideoInfo(file.path);
       setVideoInfo(info);
-      // Update the file object with video info
-      file.videoInfo = info;
     } catch (error) {
       console.error('Error loading video info:', error);
     } finally {
@@ -201,12 +182,10 @@ export const FileListItem: React.FC<FileListItemProps> = ({
           </InfoItem>
           <InfoItem>
             <label>Type:</label>
-            <span>{getFileExtension(file.name)}</span>
+            <span>{file.fileType || getFileExtension(file.name)}</span>
           </InfoItem>
         </div>
       )}
     </FileCard>
   );
 };
-
-export default FileListItem;

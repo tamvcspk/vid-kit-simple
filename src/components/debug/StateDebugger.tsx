@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
-import useAppStore from '../../states/app-state';
-import useConversionStore from '../../states/conversion-state';
-import usePreferencesStore from '../../states/preferences-state';
+import useAppStore from '../../store/app-state';
+import useConversionStore from '../../store/conversion-state';
+import usePreferencesStore from '../../store/preferences-state';
 
 export function StateDebugger() {
   const [visible, setVisible] = useState(false);

@@ -1,7 +1,7 @@
 import { ReactNode, useEffect } from 'react';
-import useAppStore from '../states/app-state';
-import useConversionStore from '../states/conversion-state';
-import usePreferencesStore from '../states/preferences-state';
+import useAppStore from '../store/app-state';
+import useConversionStore from '../store/conversion-state';
+import usePreferencesStore from '../store/preferences-state';
 
 interface GlobalStateProviderProps {
   children: ReactNode;
