@@ -29,6 +29,13 @@ chrono = { version = "0.4", features = ["serde"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 ffmpeg-next = { version = "7.1.0", features = ["static"] }
+log = "0.4"
+env_logger = "0.10"
+parking_lot = "0.12.3"
+uuid = { version = "1.16.0", features = ["v4"] }
+thiserror = "2.0.12"
+threadpool = "1.8.1"
+num_cpus = "1.16.0"
 
 [dev-dependencies]
 tempfile = "3.8.1"

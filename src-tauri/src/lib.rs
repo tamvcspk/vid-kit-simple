@@ -4,6 +4,8 @@ pub mod state;
 pub mod utils;
 
 use tauri::Manager;
+use log;
+use env_logger;
 
 use commands::init_processor_state;
 use state::StateManager;
@@ -11,12 +13,13 @@ use utils::gpu_detector::check_gpu_availability;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize logger
+    env_logger::init();
+    log::info!("Starting application");
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        // Add state to the application
-        .manage(init_processor_state())
         .manage(StateManager::new())
         .invoke_handler(tauri::generate_handler![
             // Basic commands
@@ -57,9 +60,17 @@ pub fn run() {
 
             // GPU selection
             commands::set_selected_gpu,
+
+            // Task management
+            commands::cleanup_video_tasks,
         ])
         .setup(|app| {
-            // Initialize state manager with FFmpeg and GPU information
+            // Initialize processor state with app handle
+            let app_handle = app.app_handle();
+            let processor_state = init_processor_state(&app_handle);
+            app.manage(processor_state);
+
+            // Lấy state manager chỉ sau khi đã đăng ký tất cả các state
             let state_manager = app.state::<StateManager>();
 
             // Check GPU and get list of GPUs
