@@ -67,30 +67,6 @@ impl ConversionStateManager {
     }
 }
 
-// Helper function to get active tasks
-fn get_active_tasks(state: &ConversionState) -> Vec<Uuid> {
-    state.tasks.iter()
-        .filter(|(_, task)| task.status == TaskStatus::Running)
-        .map(|(id, _)| *id)
-        .collect()
-}
-
-// Helper function to get completed tasks
-fn get_completed_tasks(state: &ConversionState) -> Vec<Uuid> {
-    state.tasks.iter()
-        .filter(|(_, task)| task.status == TaskStatus::Completed)
-        .map(|(id, _)| *id)
-        .collect()
-}
-
-// Helper function to get failed tasks
-fn get_failed_tasks(state: &ConversionState) -> Vec<Uuid> {
-    state.tasks.iter()
-        .filter(|(_, task)| task.status == TaskStatus::Failed)
-        .map(|(id, _)| *id)
-        .collect()
-}
-
 // State access functions
 pub fn get_conversion_state(state_manager: State<'_, ConversionStateManager>) -> StateResult<ConversionState> {
     Ok(state_manager.state.lock().clone())

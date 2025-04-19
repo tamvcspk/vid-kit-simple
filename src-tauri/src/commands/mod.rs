@@ -15,14 +15,13 @@
 //! the frontend using Tauri's invoke mechanism.
 
 use tauri::{AppHandle, State, Manager};
-use std::sync::Mutex;
 use std::collections::HashMap;
 
 use crate::services::video_processor::{ProcessingOptions, VideoProcessor, VideoInfo};
-use crate::services::preset_manager::{ConversionPreset};
+use crate::services::preset_manager::ConversionPreset;
 use crate::state::StateManager;
 use crate::utils::error::{AppError, ErrorCode, ErrorInfo};
-use crate::{handle_command, handle_string_as_error_info};
+use crate::{handle_command, handle_string_as_error_info, handle_command_with_event, handle_string_with_event};
 use crate::utils::error_handler;
 
 /// Basic greeting command for testing the Tauri command system
@@ -54,11 +53,11 @@ pub fn greet(name: &str) -> String {
 /// # Returns
 /// * `Result<VideoInfo, ErrorInfo>` - Video metadata or an error
 #[tauri::command]
-pub fn get_video_info(path: String) -> Result<VideoInfo, ErrorInfo> {
+pub fn get_video_info(path: String, app_handle: AppHandle) -> Result<VideoInfo, ErrorInfo> {
     // Create a new processor for this operation
     // This is a read-only operation so we don't need to use the shared state
     let processor = VideoProcessor::new();
-    handle_command!(processor.get_video_info(&path))
+    handle_command_with_event!(processor.get_video_info(&path), &app_handle)
 }
 
 /// Creates a new video processing task with the specified parameters
@@ -197,16 +196,34 @@ pub fn list_presets(app_handle: AppHandle) -> Result<Vec<ConversionPreset>, Erro
     handle_command!(manager.list_presets())
 }
 
+/// Retrieves a conversion preset by ID
+///
+/// This command fetches a specific conversion preset from storage based on its ID.
+/// It uses the event-based error handling system to report errors to the frontend.
+///
+/// # Parameters
+/// * `id` - The unique identifier of the preset to retrieve
+/// * `app_handle` - Tauri AppHandle for accessing application resources
+///
+/// # Returns
+/// * `Result<ConversionPreset, ErrorInfo>` - The preset if found, or an error
 #[tauri::command]
 pub fn get_preset(id: String, app_handle: AppHandle) -> Result<ConversionPreset, ErrorInfo> {
     let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle) {
         Ok(manager) => manager,
-        Err(e) => return Err(error_handler::string_to_error_info(
-            format!("Failed to create preset manager: {} (when getting preset {})", e, id)
-        )),
+        Err(e) => {
+            let error_msg = format!("Failed to create preset manager: {} (when getting preset {})", e, id);
+            let app_error = crate::utils::error::AppError::preset_error(
+                error_msg.clone(),
+                crate::utils::error::ErrorCode::PresetNotFound,
+                Some(format!("Error initializing preset manager to get preset {}", id))
+            );
+            app_error.log_with_event(&app_handle);
+            return Err(app_error.to_error_info());
+        }
     };
 
-    handle_string_as_error_info!(manager.get_preset(&id))
+    handle_string_with_event!(manager.get_preset(&id), &app_handle)
 }
 
 #[tauri::command]
@@ -394,20 +411,32 @@ pub struct ProcessorState {
 ///
 /// This command removes old completed and failed tasks from the VideoProcessor's
 /// task list based on their age. It helps prevent memory leaks by ensuring that
-/// old tasks don't accumulate indefinitely.
+/// old tasks don't accumulate indefinitely. It also sends a notification to the
+/// frontend when the cleanup is complete.
 ///
 /// # Parameters
 /// * `processor_state` - State containing the VideoProcessor instance
+/// * `app_handle` - Tauri AppHandle for sending notifications
 ///
 /// # Returns
 /// * `Result<(), ErrorInfo>` - Success or an error
 #[tauri::command]
-pub fn cleanup_video_tasks(processor_state: State<'_, ProcessorState>) -> Result<(), ErrorInfo> {
+pub fn cleanup_video_tasks(
+    processor_state: State<'_, ProcessorState>,
+    app_handle: AppHandle
+) -> Result<(), ErrorInfo> {
     // Clone the processor to get a mutable reference
     let mut video_processor = processor_state.video_processor.clone();
 
     // Call cleanup_tasks
     video_processor.cleanup_tasks();
+
+    // Send a notification about the cleanup
+    crate::utils::event_emitter::emit_info(
+        &app_handle,
+        "Video tasks cleanup completed",
+        Some(format!("Removed old completed and failed tasks at {}", chrono::Local::now()))
+    );
 
     Ok(())
 }

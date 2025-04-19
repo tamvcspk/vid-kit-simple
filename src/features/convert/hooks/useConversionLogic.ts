@@ -19,13 +19,13 @@ export const useConversionLogic = () => {
   const [isConverting, setIsConverting] = useState<boolean>(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState<boolean>(false);
   const [outputPath, setOutputPath] = useState<string>('');
-  const { error, setError } = useError();
+  const { error, setError, clearError } = useError();
   const { conversionState, addTask, markTaskFailed } = useConversionState();
 
   // Start conversion
   const startConversion = async (options: ConversionOptions, files: any[]) => {
     setIsConverting(true);
-    setError(null);
+    clearError(); // Use clearError instead of setError(null)
 
     try {
       // 1. Lấy ID của file đang được chọn từ state
@@ -152,6 +152,12 @@ export const useConversionLogic = () => {
 
   // Load video information and update file object
   const loadVideoInfo = async (filePath: string) => {
+    // Skip if path is empty or invalid
+    if (!filePath || filePath.trim() === '') {
+      console.log('Skipping video info loading for empty path');
+      return null;
+    }
+
     try {
       return await videoService.getVideoInfo(filePath);
     } catch (err) {

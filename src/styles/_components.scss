@@ -81,3 +81,46 @@
   max-height: $menu-max-height;
   overflow-y: auto;
 }
+
+// Notification panel styling
+.notification-panel-overlay {
+  .p-overlaypanel-content {
+    padding: 0;
+  }
+
+  .notification-panel-root {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .notification-panel-content {
+    padding: 0;
+  }
+
+  .notification-actions {
+    display: flex;
+    gap: 0.25rem;
+
+    .p-button.p-button-sm {
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+
+      &:hover {
+        background-color: var(--surface-hover);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+}
+
+// Notification button styling
+.notification-button {
+  &.p-button {
+    position: relative;
+  }
+}

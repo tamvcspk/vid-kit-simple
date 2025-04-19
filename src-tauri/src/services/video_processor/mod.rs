@@ -407,7 +407,7 @@ fn process_video(
 fn process_video_with_callback<F>(
     task: &ProcessingTask,
     progress_callback: F,
-    error_tx: std::sync::mpsc::Sender<VideoError>,
+    _error_tx: std::sync::mpsc::Sender<VideoError>,
 ) -> VideoResult<()>
 where
     F: Fn(f32) + Send + 'static,

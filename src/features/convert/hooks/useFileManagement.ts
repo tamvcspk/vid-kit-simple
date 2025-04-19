@@ -8,7 +8,7 @@ import { FileItemData } from '../components/FileList/types';
 export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>) => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const { setError } = useError();
+  const { setError, clearError } = useError();
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
   // Handle drag and drop
@@ -93,7 +93,7 @@ export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>)
   const handleSelectFile = async () => {
     try {
       setIsUploading(true);
-      setError(null);
+      clearError();
 
       // Use videoService to open native file dialog
       const filePath = await videoService.selectVideoFile();

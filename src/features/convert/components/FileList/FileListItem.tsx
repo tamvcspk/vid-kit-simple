@@ -97,8 +97,12 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Load video info if not already loaded
-    loadVideoInfo();
+    // Load video info if not already loaded and path is valid
+    if (file.path && file.path.trim() !== '') {
+      loadVideoInfo();
+    } else {
+      setIsLoading(false);
+    }
   }, [file.path]);
 
   const loadVideoInfo = async () => {

@@ -70,7 +70,7 @@ pub fn run() {
             let processor_state = init_processor_state(&app_handle);
             app.manage(processor_state);
 
-            // Lấy state manager chỉ sau khi đã đăng ký tất cả các state
+            // Get state manager after registering all states
             let state_manager = app.state::<StateManager>();
 
             // Check GPU and get list of GPUs
@@ -82,6 +82,9 @@ pub fn run() {
                 Err(_) => (false, Vec::new()),
             };
 
+            // Store the GPU count for later use
+            let gpu_count = gpus.len();
+
             // Get FFmpeg version (could add a function to video_processor to get version)
             let ffmpeg_version = Some("FFmpeg 6.0".to_string()); // Replace with actual function
 
@@ -90,7 +93,14 @@ pub fn run() {
 
             // Load preferences from file
             let app_handle = app.app_handle().clone();
-            let _ = state::load_preferences_from_file(app_handle);
+            let _ = state::load_preferences_from_file(app_handle.clone());
+
+            // Send a startup notification
+            utils::event_emitter::emit_success(
+                &app_handle,
+                "Application started successfully",
+                Some(format!("Application initialized with {} GPUs available", gpu_count))
+            );
 
             Ok(())
         })

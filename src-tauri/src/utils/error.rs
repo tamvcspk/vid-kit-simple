@@ -1,4 +1,3 @@
-use std::fmt;
 use thiserror::Error;
 use serde::{Serialize, Deserialize};
 
@@ -268,6 +267,15 @@ impl AppError {
                 eprintln!("State Error Context: {:?}", err);
             },
         }
+    }
+
+    /// Log the error to console and emit event to frontend
+    pub fn log_with_event(&self, app_handle: &tauri::AppHandle) {
+        // Log to console
+        self.log();
+
+        // Emit error event to frontend
+        crate::utils::event_emitter::emit_error(app_handle, self);
     }
 }
 

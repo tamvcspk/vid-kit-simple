@@ -8,6 +8,10 @@ import { FooterContainer, GpuStatus, GpuSelectorButton } from './Footer.styles';
 // Import debug component
 import { StateDebugger } from '../../debug/StateDebugger';
 
+// Import notification components
+import { NotificationButton } from '../../notifications';
+import { NotificationPanel } from '../../notifications';
+
 // Import hooks and types
 import { useAppState } from '../../../hooks/useAppState';
 import { GpuInfo } from '../../../types/state.types';
@@ -57,6 +61,12 @@ export function Footer() {
         />
         <Menu ref={menuRef} model={menuItems} popup />
       </GpuStatus>
+
+      {/* Notification button */}
+      <NotificationButton />
+
+      {/* Notification panel */}
+      <NotificationPanel />
 
       {/* Debug component */}
       <StateDebugger />
