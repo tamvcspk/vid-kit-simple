@@ -7,8 +7,11 @@
   ],
   "permissions": [
     "core:default",
-    "opener:default",
     "dialog:default",
+    "fs:allow-applog-read",
+    "fs:allow-applog-write",
+    "fs:allow-log-read",
+    "fs:allow-log-write",
     {
       "identifier": "fs:scope",
       "allow": [
@@ -18,7 +21,19 @@
         "$DESKTOP/**",
         "$DOCUMENT/**",
         "$DOWNLOAD/**",
-        "$VIDEO/**"
+        "$VIDEO/**",
+        "$LOG/**"
+      ]
+    },
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        {
+          "path": "$APPDATA/logs"
+        },
+        {
+          "path": "$LOG"
+        }
       ]
     }
   ]

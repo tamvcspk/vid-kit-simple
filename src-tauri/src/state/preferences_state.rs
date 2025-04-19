@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use parking_lot::Mutex;
 use serde::{Serialize, Deserialize};
 use tauri::{Manager, State, AppHandle};
-use log;
+use log::{info};
 
 use crate::state::errors::{StateError, StateResult};
 use crate::state::helpers::with_state;
@@ -73,7 +73,7 @@ pub fn save_preferences_to_file(app_handle: AppHandle) -> StateResult<()> {
     // Save file
     std::fs::write(&config_file, preferences_json)?;
 
-    log::info!("Preferences saved to {}", config_file.display());
+    info!("Preferences saved to {}", config_file.display());
     Ok(())
 }
 
@@ -86,7 +86,7 @@ pub fn load_preferences_from_file(app_handle: AppHandle) -> StateResult<()> {
 
     // Check if file exists
     if !config_file.exists() {
-        log::info!("Preferences file does not exist, using defaults");
+        info!("Preferences file does not exist, using defaults");
         return Ok(());
     }
 
@@ -105,6 +105,6 @@ pub fn load_preferences_from_file(app_handle: AppHandle) -> StateResult<()> {
         Ok(())
     })?;
 
-    log::info!("Preferences loaded from {}", config_file.display());
+    info!("Preferences loaded from {}", config_file.display());
     Ok(())
 }

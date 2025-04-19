@@ -12,6 +12,9 @@ import { StateDebugger } from '../../debug/StateDebugger';
 import { NotificationButton } from '../../notifications';
 import { NotificationPanel } from '../../notifications';
 
+// Import log buttons
+import { LogButtons } from './LogButtons';
+
 // Import hooks and types
 import { useAppState } from '../../../hooks/useAppState';
 import { GpuInfo } from '../../../types/state.types';
@@ -49,7 +52,7 @@ export function Footer() {
 
   return (
     <FooterContainer className='app-footer'>
-      <GpuStatus>
+      <GpuStatus className='gpu-status'>
         <GpuSelectorButton
           icon={selectedGpu?.is_available ? 'pi pi-desktop' : 'pi pi-microchip'}
           severity={selectedGpu?.is_available ? 'success' : 'info'}
@@ -61,6 +64,9 @@ export function Footer() {
         />
         <Menu ref={menuRef} model={menuItems} popup />
       </GpuStatus>
+
+      {/* Log buttons */}
+      <LogButtons />
 
       {/* Notification button */}
       <NotificationButton />

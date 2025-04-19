@@ -4,24 +4,22 @@ import useNotificationStore from '../../store/notification-store';
 
 const NotificationButtonContainer = styled.div`
   position: relative;
-  margin-left: auto;
-  margin-right: 1rem;
   display: flex;
   align-items: center;
 `;
 
-const StyledButton = styled(Button)<{ hasUnread: boolean }>`
+const StyledButton = styled(Button)`
   &.p-button {
     background: transparent;
     border: 1px solid var(--surface-border);
-    color: ${props => props.hasUnread ? 'var(--red-500)' : 'var(--text-color)'};
+    color: var(--text-color);
     padding: 0.25rem 0.5rem;
     transition: all 0.2s ease;
     font-size: 0.75rem;
 
     &:hover {
       background: var(--surface-hover);
-      border-color: ${props => props.hasUnread ? 'var(--red-500)' : 'var(--primary-color)'};
+      border-color: var(--primary-color);
     }
 
     &:focus {
@@ -30,11 +28,22 @@ const StyledButton = styled(Button)<{ hasUnread: boolean }>`
 
     .p-button-icon {
       font-size: 0.875rem;
-      color: ${props => props.hasUnread ? 'var(--red-500)' : 'inherit'};
     }
 
     .p-button-label {
       font-size: 0.75rem;
+    }
+  }
+
+  &.p-button.has-unread {
+    color: var(--red-500);
+
+    &:hover {
+      border-color: var(--red-500);
+    }
+
+    .p-button-icon {
+      color: var(--red-500);
     }
   }
 `;
@@ -50,8 +59,7 @@ export function NotificationButton() {
         aria-label="Notifications"
         tooltip="View Notifications"
         tooltipOptions={{ position: 'top' }}
-        className="notification-button"
-        hasUnread={unreadCount > 0}
+        className={`notification-button ${unreadCount > 0 ? 'has-unread' : ''}`}
       />
     </NotificationButtonContainer>
   );

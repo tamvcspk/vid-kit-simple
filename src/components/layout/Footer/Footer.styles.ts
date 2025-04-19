@@ -13,6 +13,10 @@ export const GpuStatus = styled.div`
   gap: 0.5rem;
   color: var(--text-color);
   font-size: 0.75rem;
+
+  &.gpu-status {
+    margin-right: auto;
+  }
 `;
 
 // GPU selector button
@@ -37,7 +41,7 @@ export const GpuSelectorButton = styled(Button)`
     .p-button-icon {
       font-size: 0.875rem;
     }
-    
+
     .p-button-label {
       font-size: 0.75rem;
     }

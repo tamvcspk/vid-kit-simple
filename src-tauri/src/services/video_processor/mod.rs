@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use log;
+use log::{error, warn, info};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use threadpool::ThreadPool;
@@ -70,12 +70,12 @@ impl VideoProcessor {
     pub fn new() -> Self {
         // Initialize FFmpeg if not already initialized
         if let Err(e) = ffmpeg::init() {
-            log::error!("Failed to initialize FFmpeg: {}", e);
+            error!("Failed to initialize FFmpeg: {}", e);
         }
 
         // Use the number of CPU cores as the thread pool size
         let num_workers = num_cpus::get();
-        log::info!("Creating video processor with {} worker threads", num_workers);
+        info!("Creating video processor with {} worker threads", num_workers);
 
         VideoProcessor {
             tasks: HashMap::new(),
@@ -107,7 +107,7 @@ impl VideoProcessor {
 
         // Start thread to monitor progress
         std::thread::spawn(move || {
-            log::info!("Starting progress monitor thread");
+            info!("Starting progress monitor thread");
 
             // Continuously receive progress updates
             while let Ok((task_id, progress)) = rx.recv() {
@@ -115,14 +115,14 @@ impl VideoProcessor {
                 if let Ok(task_uuid) = get_task_id_from_string(&task_id) {
                     // Update progress in state manager
                     if let Err(e) = conversion_state::update_conversion_progress(task_uuid, progress, app_handle_clone.clone()) {
-                        log::error!("Failed to update progress: {}", e);
+                        error!("Failed to update progress: {}", e);
                     }
                 } else {
-                    log::error!("Invalid task ID format: {}", task_id);
+                    error!("Invalid task ID format: {}", task_id);
                 }
             }
 
-            log::info!("Progress monitor thread stopped");
+            info!("Progress monitor thread stopped");
         });
 
         self.progress_monitor_running = true;
@@ -257,12 +257,12 @@ impl VideoProcessor {
         let wrapped_progress_tx = move |progress: f32| {
             // Forward progress to global channel
             if let Err(e) = global_progress_tx.send((task_id_clone.clone(), progress)) {
-                log::error!("Failed to send progress to global channel: {}", e);
+                error!("Failed to send progress to global channel: {}", e);
             }
 
             // Also send to task-specific channel
             if let Err(e) = task_progress_tx.send(progress) {
-                log::error!("Failed to send progress to task channel: {}", e);
+                error!("Failed to send progress to task channel: {}", e);
             }
         };
 
@@ -274,21 +274,21 @@ impl VideoProcessor {
                     // Success, mark task as completed
                     if let Ok(task_uuid) = get_task_id_from_string(&task_id) {
                         if let Err(e) = conversion_state::mark_task_completed(task_uuid, task.output_file.clone().unwrap_or_default(), app_handle.clone()) {
-                            log::error!("Failed to mark task as completed: {}", e);
+                            error!("Failed to mark task as completed: {}", e);
                         }
                     } else {
-                        log::error!("Invalid task ID format: {}", task_id);
+                        error!("Invalid task ID format: {}", task_id);
                     }
                 }
                 Err(e) => {
                     // Failure, mark task as failed
-                    log::error!("Task {} failed: {}", task_id, e);
+                    error!("Task {} failed: {}", task_id, e);
                     if let Ok(task_uuid) = get_task_id_from_string(&task_id) {
                         if let Err(se) = conversion_state::mark_task_failed(task_uuid, Some(e.to_string()), app_handle.clone()) {
-                            log::error!("Failed to mark task as failed: {}", se);
+                            error!("Failed to mark task as failed: {}", se);
                         }
                     } else {
-                        log::error!("Invalid task ID format: {}", task_id);
+                        error!("Invalid task ID format: {}", task_id);
                     }
                 }
             }
@@ -358,7 +358,7 @@ impl VideoProcessor {
 
         // Remove tasks
         for task_id in tasks_to_remove {
-            log::info!("Cleaning up task {}", task_id);
+            info!("Cleaning up task {}", task_id);
             self.tasks.remove(&task_id);
         }
     }
@@ -395,7 +395,7 @@ fn process_video(
     // Wrap the progress_tx in a callback
     let progress_callback = move |progress: f32| {
         if let Err(e) = progress_tx.send(progress) {
-            log::error!("Failed to send progress update: {}", e);
+            error!("Failed to send progress update: {}", e);
         }
     };
 
@@ -418,12 +418,12 @@ where
     }
 
     // Open input file
-    log::info!("Opening input file: {:?}", task.input_file);
+    info!("Opening input file: {:?}", task.input_file);
     let mut input_ctx = input(&task.input_file)
         .map_err(|e| VideoError::ffmpeg(format!("Cannot open input file '{}': {}", task.input_file.display(), e)))?;
 
     // Create output context
-    log::info!("Creating output context: {}", task.options.output_path);
+    info!("Creating output context: {}", task.options.output_path);
     let mut output_ctx = output(&task.options.output_path)
         .map_err(|e| VideoError::ffmpeg(format!("Cannot create output context for '{}': {}", task.options.output_path, e)))?;
 
@@ -507,7 +507,7 @@ where
 
         // Send packet to decoder
         if let Err(e) = decoder.send_packet(&packet) {
-            log::error!("Error sending packet to decoder: {}", e);
+            error!("Error sending packet to decoder: {}", e);
             continue;
         }
 
@@ -515,7 +515,7 @@ where
         while let Ok(_) = decoder.receive_frame(&mut decoded_frame) {
             // Convert frame if needed
             if let Err(e) = scaler.run(&decoded_frame, &mut scaled_frame) {
-                log::error!("Error scaling frame: {}", e);
+                error!("Error scaling frame: {}", e);
                 continue;
             }
 
@@ -525,7 +525,7 @@ where
 
             // Send frame to encoder
             if let Err(e) = enc.send_frame(&scaled_frame) {
-                log::error!("Error sending frame to encoder: {}", e);
+                error!("Error sending frame to encoder: {}", e);
                 continue;
             }
 
@@ -538,7 +538,7 @@ where
 
                 // Write packet to output file
                 if let Err(e) = encoded_packet.write_interleaved(&mut output_ctx) {
-                    log::error!("Error writing packet: {}", e);
+                    error!("Error writing packet: {}", e);
                 }
             }
 
@@ -560,7 +560,7 @@ where
 
     // Flush encoder
     if let Err(e) = enc.send_eof() {
-        log::error!("Error sending EOF to encoder: {}", e);
+        error!("Error sending EOF to encoder: {}", e);
     }
 
     // Process remaining packets
@@ -570,7 +570,7 @@ where
         encoded_packet.rescale_ts(input_time_base, output_time_base);
 
         if let Err(e) = encoded_packet.write_interleaved(&mut output_ctx) {
-            log::error!("Error writing final packet: {}", e);
+            error!("Error writing final packet: {}", e);
         }
     }
 
@@ -592,7 +592,7 @@ fn choose_codec(options: &ProcessingOptions) -> codec::Id {
                 "qsv" => return codec::Id::H264,
                 "vaapi" => return codec::Id::H264,
                 "videotoolbox" => return codec::Id::H264,
-                _ => log::warn!("Unknown GPU codec: {}, falling back to software H264", gpu_codec),
+                _ => warn!("Unknown GPU codec: {}, falling back to software H264", gpu_codec),
             }
         }
     }
@@ -603,7 +603,7 @@ fn choose_codec(options: &ProcessingOptions) -> codec::Id {
             "h265" => return codec::Id::HEVC,
             "vp9" => return codec::Id::VP9,
             "av1" => return codec::Id::AV1,
-            _ => log::warn!("Unknown CPU codec: {}, falling back to H264", cpu_codec),
+            _ => warn!("Unknown CPU codec: {}, falling back to H264", cpu_codec),
         }
     }
 

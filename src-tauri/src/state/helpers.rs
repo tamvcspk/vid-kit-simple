@@ -1,6 +1,6 @@
 use std::sync::{Mutex, MutexGuard};
 use std::fmt::Display;
-use log;
+use log::{error, warn};
 use parking_lot::Mutex as ParkingMutex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
@@ -28,7 +28,7 @@ pub fn lock_or_recover<T>(lock_result: std::sync::LockResult<MutexGuard<'_, T>>)
     match lock_result {
         Ok(guard) => guard,
         Err(poisoned) => {
-            log::warn!("Mutex was poisoned, recovering state");
+            warn!("Mutex was poisoned, recovering state");
             poisoned.into_inner()
         }
     }
@@ -64,7 +64,7 @@ impl<T> SafeMutex<T> for Mutex<T> {
 /// ```
 pub fn log_error<E: Display>(error: E, context: &str) -> String {
     let error_msg = format!("{}: {}", context, error);
-    log::error!("{}", error_msg);
+    error!("{}", error_msg);
     error_msg
 }
 
@@ -154,5 +154,5 @@ where
 /// log_state_error(&error, "Failed to update conversion state");
 /// ```
 pub fn log_state_error<E: std::fmt::Display>(error: &E, context: &str) {
-    log::error!("{}: {}", context, error);
+    error!("{}: {}", context, error);
 }

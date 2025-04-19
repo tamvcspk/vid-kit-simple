@@ -10,6 +10,7 @@
 //! - `error`: Defines error types and error handling utilities
 //! - `error_handler`: Provides error handling functions and macros
 //! - `event_emitter`: Utilities for emitting events to the frontend
+//! - `logger`: Provides file-based logging functionality with daily rotation
 
 /// GPU detection utility that identifies available GPUs and their capabilities
 /// for hardware-accelerated video processing
@@ -24,3 +25,6 @@ pub mod error_handler;
 
 /// Event emitter utilities for sending notifications and errors to the frontend
 pub mod event_emitter;
+
+/// Logger utilities for file-based logging with daily rotation
+pub mod logger;

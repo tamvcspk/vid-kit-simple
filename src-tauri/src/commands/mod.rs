@@ -397,6 +397,66 @@ pub fn set_selected_gpu(
     handle_string_as_error_info!(crate::state::set_selected_gpu(gpu_index, state_manager, app_handle))
 }
 
+/// Get the path to the current log file
+///
+/// This command returns the path to the current log file, which is stored
+/// in the application data directory.
+///
+/// # Parameters
+/// * `app_handle` - Tauri AppHandle for accessing application resources
+///
+/// # Returns
+/// * `Result<String, ErrorInfo>` - Path to the log file as a string if successful, or an error
+#[tauri::command]
+pub fn get_current_log_file_path(app_handle: AppHandle) -> Result<String, ErrorInfo> {
+    match crate::utils::logger::get_current_log_file_path(&app_handle) {
+        Ok(path) => Ok(path.to_string_lossy().to_string()),
+        Err(e) => Err(ErrorInfo {
+            code: ErrorCode::FileReadError,
+            message: format!("Failed to get log file path: {}", e),
+            details: Some("Error accessing log file".to_string())
+        })
+    }
+}
+
+/// Open the current log file in the default text editor
+///
+/// # Parameters
+/// * `app_handle` - Tauri AppHandle for accessing application resources
+///
+/// # Returns
+/// * `Result<bool, ErrorInfo>` - True if successful, or an error
+#[tauri::command]
+pub fn open_log_file(app_handle: AppHandle) -> Result<bool, ErrorInfo> {
+    match crate::utils::logger::open_log_file(&app_handle) {
+        Ok(result) => Ok(result),
+        Err(e) => Err(ErrorInfo {
+            code: ErrorCode::FileReadError,
+            message: format!("Failed to open log file: {}", e),
+            details: Some("Error opening log file".to_string())
+        })
+    }
+}
+
+/// Open the log directory in the file explorer
+///
+/// # Parameters
+/// * `app_handle` - Tauri AppHandle for accessing application resources
+///
+/// # Returns
+/// * `Result<bool, ErrorInfo>` - True if successful, or an error
+#[tauri::command]
+pub fn open_log_directory(app_handle: AppHandle) -> Result<bool, ErrorInfo> {
+    match crate::utils::logger::open_log_directory(&app_handle) {
+        Ok(result) => Ok(result),
+        Err(e) => Err(ErrorInfo {
+            code: ErrorCode::FileReadError,
+            message: format!("Failed to open log directory: {}", e),
+            details: Some("Error opening log directory".to_string())
+        })
+    }
+}
+
 /// State container for the VideoProcessor instance
 ///
 /// This struct is managed by Tauri's state system and provides access to the

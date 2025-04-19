@@ -88,8 +88,19 @@
   padding: 0 $spacing-lg;
   background-color: var(--surface-card);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   min-height: 32px;
   flex-shrink: 0;
   transition: background-color $transition-speed;
+
+  // Left side content
+  .gpu-status {
+    margin-right: auto;
+  }
+
+  // Right side content should be grouped together
+  > *:not(:first-child) {
+    margin-left: 0.5rem;
+  }
 }
