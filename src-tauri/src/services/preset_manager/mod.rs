@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Runtime, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 
 /// Defines a preset for video conversion with configurable parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,7 +54,9 @@ impl PresetManager {
     /// Creates a PresetManager using a fixed directory for tests
     pub fn from_app_handle<R: Runtime>(app_handle: &AppHandle<R>) -> io::Result<Self> {
         // Lấy đường dẫn đến thư mục dữ liệu của ứng dụng
-        let app_data_dir = app_handle.path().app_data_dir()
+        let app_data_dir = app_handle
+            .path()
+            .app_data_dir()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         let presets_dir = app_data_dir.join("presets");
         Self::new(presets_dir)

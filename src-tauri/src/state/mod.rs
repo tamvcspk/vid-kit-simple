@@ -139,19 +139,26 @@ pub fn set_selected_gpu(
     state_manager: State<'_, StateManager>,
     app_handle: AppHandle,
 ) -> StateResult<()> {
-    with_state(&state_manager.app.state, &app_handle, "app-state-changed", |app_state| {
-        // Check if the index is valid
-        if gpu_index == -1 || (gpu_index >= 0 && (gpu_index as usize) < app_state.gpus.len()) {
-            app_state.selected_gpu_index = gpu_index;
-            Ok(())
-        } else {
-            Err(StateError::invalid_gpu_index(gpu_index))
-        }
-    })
+    with_state(
+        &state_manager.app.state,
+        &app_handle,
+        "app-state-changed",
+        |app_state| {
+            // Check if the index is valid
+            if gpu_index == -1 || (gpu_index >= 0 && (gpu_index as usize) < app_state.gpus.len()) {
+                app_state.selected_gpu_index = gpu_index;
+                Ok(())
+            } else {
+                Err(StateError::invalid_gpu_index(gpu_index))
+            }
+        },
+    )
 }
 
 // Conversion state wrappers
-pub fn get_conversion_state(state_manager: State<'_, StateManager>) -> StateResult<conversion_state::ConversionState> {
+pub fn get_conversion_state(
+    state_manager: State<'_, StateManager>,
+) -> StateResult<conversion_state::ConversionState> {
     Ok(state_manager.conversion.state.lock().clone())
 }
 
@@ -190,25 +197,27 @@ pub fn add_conversion_task(
     let state_manager = app_handle.state::<ConversionStateManager>();
 
     // Create a new task in the conversion state
-    with_state(&state_manager.state, &app_handle, "conversion-state-changed", |state| {
-        let task = conversion_state::TaskState {
-            id: uuid::Uuid::new_v4(),
-            progress: 0.0,
-            status: conversion_state::TaskStatus::Pending,
-            file_id: task_uuid,
-            output_path: None,
-            error_message: None,
-        };
+    with_state(
+        &state_manager.state,
+        &app_handle,
+        "conversion-state-changed",
+        |state| {
+            let task = conversion_state::TaskState {
+                id: uuid::Uuid::new_v4(),
+                progress: 0.0,
+                status: conversion_state::TaskStatus::Pending,
+                file_id: task_uuid,
+                output_path: None,
+                error_message: None,
+            };
 
-        state.tasks.insert(task.id, task.clone());
-        Ok(()) // Return unit type to match the expected return type
-    })
+            state.tasks.insert(task.id, task.clone());
+            Ok(()) // Return unit type to match the expected return type
+        },
+    )
 }
 
-pub fn mark_task_failed(
-    task_id: String,
-    app_handle: AppHandle,
-) -> StateResult<()> {
+pub fn mark_task_failed(task_id: String, app_handle: AppHandle) -> StateResult<()> {
     let task_uuid = conversion_state::get_task_id_from_string(&task_id)?;
     conversion_state::mark_task_failed(task_uuid, None, app_handle)
 }
@@ -250,7 +259,9 @@ pub fn clear_file_list(
 }
 
 // Preferences wrappers
-pub fn get_preferences(state_manager: State<'_, StateManager>) -> StateResult<preferences_state::UserPreferencesState> {
+pub fn get_preferences(
+    state_manager: State<'_, StateManager>,
+) -> StateResult<preferences_state::UserPreferencesState> {
     Ok(state_manager.preferences.state.lock().clone())
 }
 
@@ -259,11 +270,16 @@ pub fn update_preferences(
     state_manager: State<'_, StateManager>,
     app_handle: AppHandle,
 ) -> StateResult<()> {
-    with_state(&state_manager.preferences.state, &app_handle, "preferences-changed", |preferences| {
-        // Update preferences
-        *preferences = new_preferences.clone();
-        Ok(())
-    })
+    with_state(
+        &state_manager.preferences.state,
+        &app_handle,
+        "preferences-changed",
+        |preferences| {
+            // Update preferences
+            *preferences = new_preferences.clone();
+            Ok(())
+        },
+    )
 }
 
 pub fn save_preferences_to_file(app_handle: AppHandle) -> StateResult<()> {

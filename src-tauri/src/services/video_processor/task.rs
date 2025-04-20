@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::mpsc::{Sender, Receiver, channel};
-use serde::{Serialize, Deserialize};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use uuid::Uuid;
 
 use super::error::VideoError;

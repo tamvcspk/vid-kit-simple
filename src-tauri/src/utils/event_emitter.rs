@@ -1,6 +1,6 @@
-use tauri::{AppHandle, Emitter};
-use serde::Serialize;
 use crate::utils::error::AppError;
+use serde::Serialize;
+use tauri::{AppHandle, Emitter};
 
 /// Emit an error event to the frontend
 pub fn emit_error(app_handle: &AppHandle, error: &AppError) {
@@ -22,7 +22,12 @@ pub struct NotificationEvent {
 }
 
 /// Emit a notification event to the frontend
-pub fn emit_notification(app_handle: &AppHandle, level: &str, message: &str, details: Option<String>) {
+pub fn emit_notification(
+    app_handle: &AppHandle,
+    level: &str,
+    message: &str,
+    details: Option<String>,
+) {
     let notification = NotificationEvent {
         level: level.to_string(),
         message: message.to_string(),

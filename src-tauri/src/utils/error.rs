@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use serde::{Serialize, Deserialize};
 
 /// Error codes for categorizing errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,42 +119,62 @@ pub enum AppError {
 impl AppError {
     /// Create a new IO error
     pub fn io_error(source: std::io::Error, code: ErrorCode, context: Option<String>) -> Self {
-        AppError::IoError { source, code, context }
+        AppError::IoError {
+            source,
+            code,
+            context,
+        }
     }
 
     /// Create a new FFmpeg error
-    pub fn ffmpeg_error(message: impl Into<String>, code: ErrorCode, context: Option<String>) -> Self {
+    pub fn ffmpeg_error(
+        message: impl Into<String>,
+        code: ErrorCode,
+        context: Option<String>,
+    ) -> Self {
         AppError::FFmpegError {
             message: message.into(),
             code,
-            context
+            context,
         }
     }
 
     /// Create a new state error
-    pub fn state_error(message: impl Into<String>, code: ErrorCode, context: Option<String>) -> Self {
+    pub fn state_error(
+        message: impl Into<String>,
+        code: ErrorCode,
+        context: Option<String>,
+    ) -> Self {
         AppError::StateError {
             message: message.into(),
             code,
-            context
+            context,
         }
     }
 
     /// Create a new preset error
-    pub fn preset_error(message: impl Into<String>, code: ErrorCode, context: Option<String>) -> Self {
+    pub fn preset_error(
+        message: impl Into<String>,
+        code: ErrorCode,
+        context: Option<String>,
+    ) -> Self {
         AppError::PresetError {
             message: message.into(),
             code,
-            context
+            context,
         }
     }
 
     /// Create a new video processing error
-    pub fn video_error(message: impl Into<String>, code: ErrorCode, context: Option<String>) -> Self {
+    pub fn video_error(
+        message: impl Into<String>,
+        code: ErrorCode,
+        context: Option<String>,
+    ) -> Self {
         AppError::VideoProcessingError {
             message: message.into(),
             code,
-            context
+            context,
         }
     }
 
@@ -163,25 +183,33 @@ impl AppError {
         AppError::GpuError {
             message: message.into(),
             code,
-            context
+            context,
         }
     }
 
     /// Create a new validation error
-    pub fn validation_error(message: impl Into<String>, code: ErrorCode, context: Option<String>) -> Self {
+    pub fn validation_error(
+        message: impl Into<String>,
+        code: ErrorCode,
+        context: Option<String>,
+    ) -> Self {
         AppError::ValidationError {
             message: message.into(),
             code,
-            context
+            context,
         }
     }
 
     /// Create a new generic error
-    pub fn other_error(message: impl Into<String>, code: ErrorCode, context: Option<String>) -> Self {
+    pub fn other_error(
+        message: impl Into<String>,
+        code: ErrorCode,
+        context: Option<String>,
+    ) -> Self {
         AppError::OtherError {
             message: message.into(),
             code,
-            context
+            context,
         }
     }
 
@@ -227,45 +255,45 @@ impl AppError {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
-            },
+            }
             AppError::FFmpegError { context, .. } => {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
-            },
+            }
             AppError::StateError { context, .. } => {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
-            },
+            }
             AppError::PresetError { context, .. } => {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
-            },
+            }
             AppError::VideoProcessingError { context, .. } => {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
-            },
+            }
             AppError::GpuError { context, .. } => {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
-            },
+            }
             AppError::ValidationError { context, .. } => {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
-            },
+            }
             AppError::OtherError { context, .. } => {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
-            },
+            }
             AppError::DomainStateError(err) => {
                 eprintln!("State Error Context: {:?}", err);
-            },
+            }
         }
     }
 
@@ -290,7 +318,9 @@ impl From<std::io::Error> for AppError {
 
         let context = match error.kind() {
             std::io::ErrorKind::NotFound => Some("File or directory not found".to_string()),
-            std::io::ErrorKind::PermissionDenied => Some("Permission denied when accessing file".to_string()),
+            std::io::ErrorKind::PermissionDenied => {
+                Some("Permission denied when accessing file".to_string())
+            }
             std::io::ErrorKind::ConnectionRefused => Some("Connection refused".to_string()),
             std::io::ErrorKind::ConnectionReset => Some("Connection reset".to_string()),
             std::io::ErrorKind::ConnectionAborted => Some("Connection aborted".to_string()),
@@ -314,7 +344,7 @@ impl From<std::io::Error> for AppError {
         AppError::IoError {
             source: error,
             code,
-            context
+            context,
         }
     }
 }
@@ -324,7 +354,7 @@ impl From<String> for AppError {
         AppError::VideoProcessingError {
             message: error,
             code: ErrorCode::VideoProcessingFailed,
-            context: Some("Error during video processing operation".to_string())
+            context: Some("Error during video processing operation".to_string()),
         }
     }
 }
@@ -334,7 +364,7 @@ impl From<&str> for AppError {
         AppError::VideoProcessingError {
             message: error.to_string(),
             code: ErrorCode::VideoProcessingFailed,
-            context: Some("Error during video processing operation".to_string())
+            context: Some("Error during video processing operation".to_string()),
         }
     }
 }
@@ -346,53 +376,70 @@ impl From<crate::services::video_processor::VideoError> for AppError {
             crate::services::video_processor::VideoError::Io(e) => AppError::IoError {
                 source: e,
                 code: ErrorCode::FileReadError,
-                context: Some("Video file access error".to_string())
+                context: Some("Video file access error".to_string()),
             },
             crate::services::video_processor::VideoError::Ffmpeg(msg) => AppError::FFmpegError {
                 message: msg,
                 code: ErrorCode::FFmpegInitError,
-                context: Some("FFmpeg operation failed".to_string())
+                context: Some("FFmpeg operation failed".to_string()),
             },
-            crate::services::video_processor::VideoError::TaskNotFound(id) => AppError::OtherError {
-                message: format!("Task not found: {}", id),
-                code: ErrorCode::TaskNotFound,
-                context: Some("Video processing task lookup failed".to_string())
-            },
-            crate::services::video_processor::VideoError::NoVideoStream(path) => AppError::VideoProcessingError {
-                message: format!("No video stream found in {:?}", path),
-                code: ErrorCode::InvalidVideoFormat,
-                context: Some(format!("File does not contain a valid video stream: {:?}", path))
-            },
-            crate::services::video_processor::VideoError::Codec(msg) => AppError::VideoProcessingError {
-                message: msg,
-                code: ErrorCode::CodecNotSupported,
-                context: Some("Video codec not supported or not found".to_string())
-            },
-            crate::services::video_processor::VideoError::Encoder(msg) => AppError::VideoProcessingError {
-                message: msg,
-                code: ErrorCode::EncodingError,
-                context: Some("Video encoding operation failed".to_string())
-            },
-            crate::services::video_processor::VideoError::Decoder(msg) => AppError::VideoProcessingError {
-                message: msg,
-                code: ErrorCode::DecodingError,
-                context: Some("Video decoding operation failed".to_string())
-            },
-            crate::services::video_processor::VideoError::InvalidParam(msg) => AppError::ValidationError {
-                message: msg,
-                code: ErrorCode::InvalidArgument,
-                context: Some("Invalid parameter for video processing".to_string())
-            },
-            crate::services::video_processor::VideoError::ThreadPool(msg) => AppError::VideoProcessingError {
-                message: msg,
-                code: ErrorCode::VideoProcessingFailed,
-                context: Some("Thread pool error during video processing".to_string())
-            },
+            crate::services::video_processor::VideoError::TaskNotFound(id) => {
+                AppError::OtherError {
+                    message: format!("Task not found: {}", id),
+                    code: ErrorCode::TaskNotFound,
+                    context: Some("Video processing task lookup failed".to_string()),
+                }
+            }
+            crate::services::video_processor::VideoError::NoVideoStream(path) => {
+                AppError::VideoProcessingError {
+                    message: format!("No video stream found in {:?}", path),
+                    code: ErrorCode::InvalidVideoFormat,
+                    context: Some(format!(
+                        "File does not contain a valid video stream: {:?}",
+                        path
+                    )),
+                }
+            }
+            crate::services::video_processor::VideoError::Codec(msg) => {
+                AppError::VideoProcessingError {
+                    message: msg,
+                    code: ErrorCode::CodecNotSupported,
+                    context: Some("Video codec not supported or not found".to_string()),
+                }
+            }
+            crate::services::video_processor::VideoError::Encoder(msg) => {
+                AppError::VideoProcessingError {
+                    message: msg,
+                    code: ErrorCode::EncodingError,
+                    context: Some("Video encoding operation failed".to_string()),
+                }
+            }
+            crate::services::video_processor::VideoError::Decoder(msg) => {
+                AppError::VideoProcessingError {
+                    message: msg,
+                    code: ErrorCode::DecodingError,
+                    context: Some("Video decoding operation failed".to_string()),
+                }
+            }
+            crate::services::video_processor::VideoError::InvalidParam(msg) => {
+                AppError::ValidationError {
+                    message: msg,
+                    code: ErrorCode::InvalidArgument,
+                    context: Some("Invalid parameter for video processing".to_string()),
+                }
+            }
+            crate::services::video_processor::VideoError::ThreadPool(msg) => {
+                AppError::VideoProcessingError {
+                    message: msg,
+                    code: ErrorCode::VideoProcessingFailed,
+                    context: Some("Thread pool error during video processing".to_string()),
+                }
+            }
             crate::services::video_processor::VideoError::State(e) => AppError::DomainStateError(e),
             crate::services::video_processor::VideoError::Other(msg) => AppError::OtherError {
                 message: msg,
                 code: ErrorCode::VideoProcessingFailed,
-                context: Some("Unexpected error during video processing".to_string())
+                context: Some("Unexpected error during video processing".to_string()),
             },
         }
     }

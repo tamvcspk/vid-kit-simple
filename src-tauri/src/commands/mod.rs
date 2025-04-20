@@ -14,15 +14,18 @@
 //! Each command is annotated with `#[tauri::command]` and can be invoked from
 //! the frontend using Tauri's invoke mechanism.
 
-use tauri::{AppHandle, State, Manager};
 use std::collections::HashMap;
+use tauri::{AppHandle, Manager, State};
 
-use crate::services::video_processor::{ProcessingOptions, VideoProcessor, VideoInfo};
 use crate::services::preset_manager::ConversionPreset;
+use crate::services::video_processor::{ProcessingOptions, VideoInfo, VideoProcessor};
 use crate::state::StateManager;
 use crate::utils::error::{AppError, ErrorCode, ErrorInfo};
-use crate::{handle_command, handle_string_as_error_info, handle_command_with_event, handle_string_with_event};
 use crate::utils::error_handler;
+use crate::{
+    handle_command, handle_command_with_event, handle_string_as_error_info,
+    handle_string_with_event,
+};
 
 /// Basic greeting command for testing the Tauri command system
 ///
@@ -81,7 +84,7 @@ pub fn create_processing_task(
     output_file: String,
     settings: HashMap<String, String>,
     app_handle: tauri::AppHandle,
-    processor_state: State<'_, ProcessorState>
+    processor_state: State<'_, ProcessorState>,
 ) -> Result<String, ErrorInfo> {
     // Create options from settings
     let options = match make_processing_options(&settings) {
@@ -90,7 +93,10 @@ pub fn create_processing_task(
             return Err(ErrorInfo {
                 code: ErrorCode::InvalidArgument,
                 message: format!("Invalid settings: {}", e),
-                details: Some(format!("Error parsing conversion settings for file: {}", input_file))
+                details: Some(format!(
+                    "Error parsing conversion settings for file: {}",
+                    input_file
+                )),
             });
         }
     };
@@ -116,7 +122,10 @@ pub fn create_processing_task(
             return Err(ErrorInfo {
                 code: ErrorCode::VideoProcessingFailed,
                 message: format!("Failed to create processing task: {}", e),
-                details: Some(format!("Error creating processing task for input file: {} and output file: {}", input_file_copy, output_file_copy))
+                details: Some(format!(
+                    "Error creating processing task for input file: {} and output file: {}",
+                    input_file_copy, output_file_copy
+                )),
             });
         }
     };
@@ -133,7 +142,7 @@ pub fn create_processing_task(
 pub fn run_processing_task(
     task_id: String,
     processor_state: State<'_, ProcessorState>,
-    app_handle: AppHandle
+    app_handle: AppHandle,
 ) -> Result<(), ErrorInfo> {
     // Use video_processor from processor_state
     // We need to clone it to get a mutable reference
@@ -149,7 +158,7 @@ pub fn run_processing_task(
             return Err(ErrorInfo {
                 code: ErrorCode::TaskNotFound,
                 message: format!("Invalid task ID: {}", e),
-                details: Some(format!("Could not find or parse task ID: {}", task_id))
+                details: Some(format!("Could not find or parse task ID: {}", task_id)),
             });
         }
     };
@@ -166,14 +175,22 @@ pub fn run_processing_task(
         Ok(_) => Ok(()),
         Err(e) => {
             // Mark task as failed in state manager
-            if let Err(state_err) = crate::state::mark_task_failed(task_id.clone(), app_handle.clone()) {
-                log::warn!("Failed to mark task as failed in state manager: {}", state_err);
+            if let Err(state_err) =
+                crate::state::mark_task_failed(task_id.clone(), app_handle.clone())
+            {
+                log::warn!(
+                    "Failed to mark task as failed in state manager: {}",
+                    state_err
+                );
             }
 
             Err(ErrorInfo {
                 code: ErrorCode::VideoProcessingFailed,
                 message: format!("Failed to run processing task: {}", e),
-                details: Some(format!("Error executing video processing task: {}", task_id))
+                details: Some(format!(
+                    "Error executing video processing task: {}",
+                    task_id
+                )),
             })
         }
     }
@@ -182,13 +199,14 @@ pub fn run_processing_task(
 // Preset management commands
 #[tauri::command]
 pub fn list_presets(app_handle: AppHandle) -> Result<Vec<ConversionPreset>, ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle) {
+    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
+    {
         Ok(manager) => manager,
         Err(e) => {
             return Err(error_handler::to_error_info(AppError::preset_error(
                 format!("Failed to create preset manager: {}", e),
                 ErrorCode::PresetValidationError,
-                Some("Error initializing preset manager to list presets".to_string())
+                Some("Error initializing preset manager to list presets".to_string()),
             )));
         }
     };
@@ -209,14 +227,21 @@ pub fn list_presets(app_handle: AppHandle) -> Result<Vec<ConversionPreset>, Erro
 /// * `Result<ConversionPreset, ErrorInfo>` - The preset if found, or an error
 #[tauri::command]
 pub fn get_preset(id: String, app_handle: AppHandle) -> Result<ConversionPreset, ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle) {
+    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
+    {
         Ok(manager) => manager,
         Err(e) => {
-            let error_msg = format!("Failed to create preset manager: {} (when getting preset {})", e, id);
+            let error_msg = format!(
+                "Failed to create preset manager: {} (when getting preset {})",
+                e, id
+            );
             let app_error = crate::utils::error::AppError::preset_error(
                 error_msg.clone(),
                 crate::utils::error::ErrorCode::PresetNotFound,
-                Some(format!("Error initializing preset manager to get preset {}", id))
+                Some(format!(
+                    "Error initializing preset manager to get preset {}",
+                    id
+                )),
             );
             app_error.log_with_event(&app_handle);
             return Err(app_error.to_error_info());
@@ -228,11 +253,15 @@ pub fn get_preset(id: String, app_handle: AppHandle) -> Result<ConversionPreset,
 
 #[tauri::command]
 pub fn save_preset(preset: ConversionPreset, app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle) {
+    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
+    {
         Ok(manager) => manager,
-        Err(e) => return Err(error_handler::string_to_error_info(
-            format!("Failed to create preset manager: {} (when saving preset {})", e, preset.name)
-        )),
+        Err(e) => {
+            return Err(error_handler::string_to_error_info(format!(
+                "Failed to create preset manager: {} (when saving preset {})",
+                e, preset.name
+            )))
+        }
     };
 
     handle_string_as_error_info!(manager.save_preset(&preset))
@@ -240,11 +269,15 @@ pub fn save_preset(preset: ConversionPreset, app_handle: AppHandle) -> Result<()
 
 #[tauri::command]
 pub fn delete_preset(id: String, app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle) {
+    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
+    {
         Ok(manager) => manager,
-        Err(e) => return Err(error_handler::string_to_error_info(
-            format!("Failed to create preset manager: {} (when deleting preset {})", e, id)
-        )),
+        Err(e) => {
+            return Err(error_handler::string_to_error_info(format!(
+                "Failed to create preset manager: {} (when deleting preset {})",
+                e, id
+            )))
+        }
     };
 
     handle_string_as_error_info!(manager.delete_preset(&id))
@@ -252,11 +285,15 @@ pub fn delete_preset(id: String, app_handle: AppHandle) -> Result<(), ErrorInfo>
 
 #[tauri::command]
 pub fn create_default_presets(app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle) {
+    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
+    {
         Ok(manager) => manager,
-        Err(e) => return Err(error_handler::string_to_error_info(
-            format!("Failed to create preset manager: {} (when creating default presets)", e)
-        )),
+        Err(e) => {
+            return Err(error_handler::string_to_error_info(format!(
+                "Failed to create preset manager: {} (when creating default presets)",
+                e
+            )))
+        }
     };
 
     handle_string_as_error_info!(manager.create_default_presets())
@@ -269,7 +306,9 @@ pub fn update_conversion_progress_wrapper(
     progress: f32,
     app_handle: AppHandle,
 ) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::update_conversion_progress(task_id, progress, app_handle))
+    handle_string_as_error_info!(crate::state::update_conversion_progress(
+        task_id, progress, app_handle
+    ))
 }
 
 #[tauri::command]
@@ -281,26 +320,29 @@ pub fn add_conversion_task_wrapper(
 }
 
 #[tauri::command]
-pub fn mark_task_failed_wrapper(
-    task_id: String,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
+pub fn mark_task_failed_wrapper(task_id: String, app_handle: AppHandle) -> Result<(), ErrorInfo> {
     handle_string_as_error_info!(crate::state::mark_task_failed(task_id, app_handle))
 }
 
 // State access commands
 #[tauri::command]
-pub fn get_app_state(state_manager: State<'_, StateManager>) -> Result<crate::state::app_state::AppState, ErrorInfo> {
+pub fn get_app_state(
+    state_manager: State<'_, StateManager>,
+) -> Result<crate::state::app_state::AppState, ErrorInfo> {
     handle_string_as_error_info!(crate::state::get_app_state(state_manager))
 }
 
 #[tauri::command]
-pub fn get_conversion_state(state_manager: State<'_, StateManager>) -> Result<crate::state::conversion_state::ConversionState, ErrorInfo> {
+pub fn get_conversion_state(
+    state_manager: State<'_, StateManager>,
+) -> Result<crate::state::conversion_state::ConversionState, ErrorInfo> {
     handle_string_as_error_info!(crate::state::get_conversion_state(state_manager))
 }
 
 #[tauri::command]
-pub fn get_preferences(state_manager: State<'_, StateManager>) -> Result<crate::state::preferences_state::UserPreferencesState, ErrorInfo> {
+pub fn get_preferences(
+    state_manager: State<'_, StateManager>,
+) -> Result<crate::state::preferences_state::UserPreferencesState, ErrorInfo> {
     handle_string_as_error_info!(crate::state::get_preferences(state_manager))
 }
 
@@ -310,11 +352,17 @@ pub fn update_preferences(
     state_manager: State<'_, StateManager>,
     app_handle: AppHandle,
 ) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::update_preferences(preferences, state_manager, app_handle))
+    handle_string_as_error_info!(crate::state::update_preferences(
+        preferences,
+        state_manager,
+        app_handle
+    ))
 }
 
 #[tauri::command]
-pub fn get_global_state(state_manager: State<'_, StateManager>) -> Result<crate::state::GlobalState, ErrorInfo> {
+pub fn get_global_state(
+    state_manager: State<'_, StateManager>,
+) -> Result<crate::state::GlobalState, ErrorInfo> {
     handle_string_as_error_info!(crate::state::get_global_state(state_manager))
 }
 
@@ -349,7 +397,11 @@ pub fn add_file_to_list(
         thumbnail,
     };
 
-    handle_command!(crate::state::add_file_to_list(file_info, state_manager, app_handle))
+    handle_command!(crate::state::add_file_to_list(
+        file_info,
+        state_manager,
+        app_handle
+    ))
 }
 
 #[tauri::command]
@@ -358,7 +410,11 @@ pub fn remove_file_from_list(
     state_manager: State<'_, StateManager>,
     app_handle: AppHandle,
 ) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::remove_file_from_list(file_id, state_manager, app_handle))
+    handle_string_as_error_info!(crate::state::remove_file_from_list(
+        file_id,
+        state_manager,
+        app_handle
+    ))
 }
 
 #[tauri::command]
@@ -367,7 +423,11 @@ pub fn select_file(
     state_manager: State<'_, StateManager>,
     app_handle: AppHandle,
 ) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::select_file(file_id, state_manager, app_handle))
+    handle_string_as_error_info!(crate::state::select_file(
+        file_id,
+        state_manager,
+        app_handle
+    ))
 }
 
 #[tauri::command]
@@ -394,7 +454,11 @@ pub fn set_selected_gpu(
     state_manager: State<'_, StateManager>,
     app_handle: AppHandle,
 ) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::set_selected_gpu(gpu_index, state_manager, app_handle))
+    handle_string_as_error_info!(crate::state::set_selected_gpu(
+        gpu_index,
+        state_manager,
+        app_handle
+    ))
 }
 
 /// Get the path to the current log file
@@ -414,8 +478,8 @@ pub fn get_current_log_file_path(app_handle: AppHandle) -> Result<String, ErrorI
         Err(e) => Err(ErrorInfo {
             code: ErrorCode::FileReadError,
             message: format!("Failed to get log file path: {}", e),
-            details: Some("Error accessing log file".to_string())
-        })
+            details: Some("Error accessing log file".to_string()),
+        }),
     }
 }
 
@@ -433,8 +497,8 @@ pub fn open_log_file(app_handle: AppHandle) -> Result<bool, ErrorInfo> {
         Err(e) => Err(ErrorInfo {
             code: ErrorCode::FileReadError,
             message: format!("Failed to open log file: {}", e),
-            details: Some("Error opening log file".to_string())
-        })
+            details: Some("Error opening log file".to_string()),
+        }),
     }
 }
 
@@ -452,8 +516,8 @@ pub fn open_log_directory(app_handle: AppHandle) -> Result<bool, ErrorInfo> {
         Err(e) => Err(ErrorInfo {
             code: ErrorCode::FileReadError,
             message: format!("Failed to open log directory: {}", e),
-            details: Some("Error opening log directory".to_string())
-        })
+            details: Some("Error opening log directory".to_string()),
+        }),
     }
 }
 
@@ -483,7 +547,7 @@ pub struct ProcessorState {
 #[tauri::command]
 pub fn cleanup_video_tasks(
     processor_state: State<'_, ProcessorState>,
-    app_handle: AppHandle
+    app_handle: AppHandle,
 ) -> Result<(), ErrorInfo> {
     // Clone the processor to get a mutable reference
     let mut video_processor = processor_state.video_processor.clone();
@@ -495,7 +559,10 @@ pub fn cleanup_video_tasks(
     crate::utils::event_emitter::emit_info(
         &app_handle,
         "Video tasks cleanup completed",
-        Some(format!("Removed old completed and failed tasks at {}", chrono::Local::now()))
+        Some(format!(
+            "Removed old completed and failed tasks at {}",
+            chrono::Local::now()
+        )),
     );
 
     Ok(())
@@ -561,15 +628,23 @@ pub fn register_processor_state(app: &mut tauri::App) -> Result<(), Box<dyn std:
 ///
 /// # Returns
 /// * `Result<ProcessingOptions, String>` - Parsed options or an error message
-fn make_processing_options(settings: &HashMap<String, String>) -> Result<ProcessingOptions, String> {
+fn make_processing_options(
+    settings: &HashMap<String, String>,
+) -> Result<ProcessingOptions, String> {
     // Default options
     let mut options = ProcessingOptions {
-        output_format: settings.get("format").cloned().unwrap_or_else(|| "mp4".to_string()),
+        output_format: settings
+            .get("format")
+            .cloned()
+            .unwrap_or_else(|| "mp4".to_string()),
         output_path: String::new(), // Will be set by output_file in create_task function
         resolution: None,
         bitrate: None,
         framerate: None,
-        use_gpu: settings.get("use_gpu").map(|s| s == "true").unwrap_or(false),
+        use_gpu: settings
+            .get("use_gpu")
+            .map(|s| s == "true")
+            .unwrap_or(false),
         gpu_codec: None,
         cpu_codec: None,
     };
@@ -577,7 +652,7 @@ fn make_processing_options(settings: &HashMap<String, String>) -> Result<Process
     // Handle resolution
     if let (Some(width), Some(height)) = (
         settings.get("width").and_then(|w| w.parse::<u32>().ok()),
-        settings.get("height").and_then(|h| h.parse::<u32>().ok())
+        settings.get("height").and_then(|h| h.parse::<u32>().ok()),
     ) {
         options.resolution = Some((width, height));
     }
@@ -600,7 +675,10 @@ fn make_processing_options(settings: &HashMap<String, String>) -> Result<Process
     if options.use_gpu {
         options.gpu_codec = settings.get("gpu_codec").cloned();
     } else {
-        options.cpu_codec = settings.get("cpu_codec").cloned().or(Some("h264".to_string()));
+        options.cpu_codec = settings
+            .get("cpu_codec")
+            .cloned()
+            .or(Some("h264".to_string()));
     }
 
     Ok(options)

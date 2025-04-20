@@ -31,6 +31,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["config/log4rs.yaml"]
+    "resources": []
   }
 }

@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use log::info;
 use parking_lot::Mutex;
-use serde::{Serialize, Deserialize};
-use tauri::{Manager, State, AppHandle};
-use log::{info};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use tauri::{AppHandle, Manager, State};
 
 use crate::state::errors::{StateError, StateResult};
 use crate::state::helpers::with_state;
@@ -34,7 +34,9 @@ impl PreferencesStateManager {
 }
 
 // State access functions
-pub fn get_preferences(state_manager: State<'_, PreferencesStateManager>) -> StateResult<UserPreferencesState> {
+pub fn get_preferences(
+    state_manager: State<'_, PreferencesStateManager>,
+) -> StateResult<UserPreferencesState> {
     Ok(state_manager.state.lock().clone())
 }
 
@@ -43,11 +45,16 @@ pub fn update_preferences(
     state_manager: State<'_, PreferencesStateManager>,
     app_handle: AppHandle,
 ) -> StateResult<()> {
-    with_state(&state_manager.state, &app_handle, "preferences-changed", |preferences| {
-        // Update preferences
-        *preferences = new_preferences.clone();
-        Ok(())
-    })
+    with_state(
+        &state_manager.state,
+        &app_handle,
+        "preferences-changed",
+        |preferences| {
+            // Update preferences
+            *preferences = new_preferences.clone();
+            Ok(())
+        },
+    )
 }
 
 // Preferences file operations
@@ -60,7 +67,9 @@ pub fn save_preferences_to_file(app_handle: AppHandle) -> StateResult<()> {
         .map_err(|e| StateError::other(format!("Failed to serialize preferences: {}", e)))?;
 
     // Get path to configuration directory
-    let app_dir = app_handle.path().app_data_dir()
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
         .map_err(|e| StateError::other(format!("Failed to get app directory: {}", e)))?;
 
     let config_file = app_dir.join("preferences.json");
@@ -79,7 +88,9 @@ pub fn save_preferences_to_file(app_handle: AppHandle) -> StateResult<()> {
 
 pub fn load_preferences_from_file(app_handle: AppHandle) -> StateResult<()> {
     // Get path to configuration directory
-    let app_dir = app_handle.path().app_data_dir()
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
         .map_err(|e| StateError::other(format!("Failed to get app directory: {}", e)))?;
 
     let config_file = app_dir.join("preferences.json");
@@ -99,11 +110,16 @@ pub fn load_preferences_from_file(app_handle: AppHandle) -> StateResult<()> {
 
     // Update state and emit event
     let state = app_handle.state::<PreferencesStateManager>();
-    
-    with_state(&state.state, &app_handle, "preferences-changed", |preferences| {
-        *preferences = loaded_preferences.clone();
-        Ok(())
-    })?;
+
+    with_state(
+        &state.state,
+        &app_handle,
+        "preferences-changed",
+        |preferences| {
+            *preferences = loaded_preferences.clone();
+            Ok(())
+        },
+    )?;
 
     info!("Preferences loaded from {}", config_file.display());
     Ok(())

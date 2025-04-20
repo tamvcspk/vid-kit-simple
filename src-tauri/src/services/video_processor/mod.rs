@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use log::{error, warn, info};
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use threadpool::ThreadPool;
@@ -14,16 +14,16 @@ use crate::state::conversion_state;
 use crate::state::conversion_state::get_task_id_from_string;
 
 // Re-export from FFmpeg
-use ffmpeg_next as ffmpeg;
-use ffmpeg::format::{input, output};
 use ffmpeg::codec::{self, encoder};
+use ffmpeg::format::{input, output};
 use ffmpeg::media::Type as MediaType;
 use ffmpeg::software::scaling::{context::Context as ScalingContext, flag::Flags as ScalingFlags};
 use ffmpeg::util::frame::video::Video as VideoFrame;
 use ffmpeg::util::rational::Rational;
+use ffmpeg_next as ffmpeg;
 
 pub use error::{VideoError, VideoResult};
-pub use task::{ProcessingTask, TaskStatus, TaskChannels};
+pub use task::{ProcessingTask, TaskChannels, TaskStatus};
 
 /// Video information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +75,10 @@ impl VideoProcessor {
 
         // Use the number of CPU cores as the thread pool size
         let num_workers = num_cpus::get();
-        info!("Creating video processor with {} worker threads", num_workers);
+        info!(
+            "Creating video processor with {} worker threads",
+            num_workers
+        );
 
         VideoProcessor {
             tasks: HashMap::new(),
@@ -114,7 +117,11 @@ impl VideoProcessor {
                 // Convert task_id to Uuid
                 if let Ok(task_uuid) = get_task_id_from_string(&task_id) {
                     // Update progress in state manager
-                    if let Err(e) = conversion_state::update_conversion_progress(task_uuid, progress, app_handle_clone.clone()) {
+                    if let Err(e) = conversion_state::update_conversion_progress(
+                        task_uuid,
+                        progress,
+                        app_handle_clone.clone(),
+                    ) {
                         error!("Failed to update progress: {}", e);
                     }
                 } else {
@@ -134,8 +141,13 @@ impl VideoProcessor {
         let path = PathBuf::from(file_path);
 
         // Open input file
-        let input_ctx = input(&path)
-            .map_err(|e| VideoError::ffmpeg(format!("Cannot open video file '{}': {}", path.display(), e)))?;
+        let input_ctx = input(&path).map_err(|e| {
+            VideoError::ffmpeg(format!(
+                "Cannot open video file '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
 
         // Find video stream
         let stream = input_ctx
@@ -145,12 +157,22 @@ impl VideoProcessor {
 
         // Create context from parameters
         let codec_ctx = ffmpeg::codec::context::Context::from_parameters(stream.parameters())
-            .map_err(|e| VideoError::decoder(format!("Cannot create decoder context for file '{}': {}", path.display(), e)))?;
+            .map_err(|e| {
+                VideoError::decoder(format!(
+                    "Cannot create decoder context for file '{}': {}",
+                    path.display(),
+                    e
+                ))
+            })?;
 
         // Create decoder
-        let decoder = codec_ctx.decoder()
-            .video()
-            .map_err(|e| VideoError::decoder(format!("Cannot create decoder for file '{}': {}", path.display(), e)))?;
+        let decoder = codec_ctx.decoder().video().map_err(|e| {
+            VideoError::decoder(format!(
+                "Cannot create decoder for file '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
 
         // Get format information
         let format_name = input_ctx.format().name().to_string();
@@ -167,13 +189,15 @@ impl VideoProcessor {
 
         // Get framerate information
         let framerate = if stream.avg_frame_rate().numerator() != 0 {
-            stream.avg_frame_rate().numerator() as f32 / stream.avg_frame_rate().denominator() as f32
+            stream.avg_frame_rate().numerator() as f32
+                / stream.avg_frame_rate().denominator() as f32
         } else {
             0.0
         };
 
         // Get codec information
-        let codec_name = decoder.codec()
+        let codec_name = decoder
+            .codec()
             .map(|c| c.name().to_string())
             .unwrap_or_else(|| "unknown".to_string());
 
@@ -190,7 +214,12 @@ impl VideoProcessor {
     }
 
     /// Create a new processing task
-    pub fn create_task(&mut self, input_file: String, output_file: String, options: ProcessingOptions) -> VideoResult<String> {
+    pub fn create_task(
+        &mut self,
+        input_file: String,
+        output_file: String,
+        options: ProcessingOptions,
+    ) -> VideoResult<String> {
         // Convert input_file to PathBuf
         let input_path = PathBuf::from(input_file);
 
@@ -273,7 +302,11 @@ impl VideoProcessor {
                 Ok(_) => {
                     // Success, mark task as completed
                     if let Ok(task_uuid) = get_task_id_from_string(&task_id) {
-                        if let Err(e) = conversion_state::mark_task_completed(task_uuid, task.output_file.clone().unwrap_or_default(), app_handle.clone()) {
+                        if let Err(e) = conversion_state::mark_task_completed(
+                            task_uuid,
+                            task.output_file.clone().unwrap_or_default(),
+                            app_handle.clone(),
+                        ) {
                             error!("Failed to mark task as completed: {}", e);
                         }
                     } else {
@@ -284,7 +317,11 @@ impl VideoProcessor {
                     // Failure, mark task as failed
                     error!("Task {} failed: {}", task_id, e);
                     if let Ok(task_uuid) = get_task_id_from_string(&task_id) {
-                        if let Err(se) = conversion_state::mark_task_failed(task_uuid, Some(e.to_string()), app_handle.clone()) {
+                        if let Err(se) = conversion_state::mark_task_failed(
+                            task_uuid,
+                            Some(e.to_string()),
+                            app_handle.clone(),
+                        ) {
                             error!("Failed to mark task as failed: {}", se);
                         }
                     } else {
@@ -326,7 +363,9 @@ impl VideoProcessor {
         let failed_threshold = std::time::Duration::from_secs(24 * 60 * 60); // 24 hours
 
         // Collect task IDs to remove
-        let tasks_to_remove: Vec<String> = self.tasks.iter()
+        let tasks_to_remove: Vec<String> = self
+            .tasks
+            .iter()
             .filter(|(_, task)| {
                 match task.status {
                     // Keep running and pending tasks
@@ -340,7 +379,7 @@ impl VideoProcessor {
                             }
                         }
                         false
-                    },
+                    }
 
                     // Remove failed and canceled tasks after 24 hours
                     TaskStatus::Failed | TaskStatus::Canceled => {
@@ -350,7 +389,7 @@ impl VideoProcessor {
                             }
                         }
                         false
-                    },
+                    }
                 }
             })
             .map(|(id, _)| id.clone())
@@ -419,16 +458,27 @@ where
 
     // Open input file
     info!("Opening input file: {:?}", task.input_file);
-    let mut input_ctx = input(&task.input_file)
-        .map_err(|e| VideoError::ffmpeg(format!("Cannot open input file '{}': {}", task.input_file.display(), e)))?;
+    let mut input_ctx = input(&task.input_file).map_err(|e| {
+        VideoError::ffmpeg(format!(
+            "Cannot open input file '{}': {}",
+            task.input_file.display(),
+            e
+        ))
+    })?;
 
     // Create output context
     info!("Creating output context: {}", task.options.output_path);
-    let mut output_ctx = output(&task.options.output_path)
-        .map_err(|e| VideoError::ffmpeg(format!("Cannot create output context for '{}': {}", task.options.output_path, e)))?;
+    let mut output_ctx = output(&task.options.output_path).map_err(|e| {
+        VideoError::ffmpeg(format!(
+            "Cannot create output context for '{}': {}",
+            task.options.output_path, e
+        ))
+    })?;
 
     // Find video stream
-    let input_stream = input_ctx.streams().best(MediaType::Video)
+    let input_stream = input_ctx
+        .streams()
+        .best(MediaType::Video)
         .ok_or_else(|| VideoError::NoVideoStream(task.input_file.clone()))?;
 
     let input_stream_index = input_stream.index();
@@ -440,8 +490,8 @@ where
 
     // Choose codec based on options
     let codec_id = choose_codec(&task.options);
-    let encoder_codec = encoder::find(codec_id)
-        .ok_or_else(|| VideoError::codec("Encoder codec not found"))?;
+    let encoder_codec =
+        encoder::find(codec_id).ok_or_else(|| VideoError::codec("Encoder codec not found"))?;
 
     // Create output stream
     let mut output_stream = output_ctx.add_stream(encoder_codec)?;
@@ -451,8 +501,16 @@ where
     let mut enc = encoder_ctx.encoder().video()?;
 
     // Set encoder parameters
-    let width = if let Some((w, _)) = task.options.resolution { w } else { decoder.width() };
-    let height = if let Some((_, h)) = task.options.resolution { h } else { decoder.height() };
+    let width = if let Some((w, _)) = task.options.resolution {
+        w
+    } else {
+        decoder.width()
+    };
+    let height = if let Some((_, h)) = task.options.resolution {
+        h
+    } else {
+        decoder.height()
+    };
 
     // Ensure dimensions are divisible by 2 (required by many encoders)
     let width = width - (width % 2);
@@ -494,7 +552,9 @@ where
 
     // Estimate total frames
     if input_ctx.duration() > 0 && framerate.numerator() > 0 {
-        total_frames = (input_ctx.duration() as f64 / f64::from(ffmpeg::ffi::AV_TIME_BASE) * framerate.numerator() as f64 / framerate.denominator() as f64) as i32;
+        total_frames = (input_ctx.duration() as f64 / f64::from(ffmpeg::ffi::AV_TIME_BASE)
+            * framerate.numerator() as f64
+            / framerate.denominator() as f64) as i32;
     }
 
     // Process each packet
@@ -592,7 +652,10 @@ fn choose_codec(options: &ProcessingOptions) -> codec::Id {
                 "qsv" => return codec::Id::H264,
                 "vaapi" => return codec::Id::H264,
                 "videotoolbox" => return codec::Id::H264,
-                _ => warn!("Unknown GPU codec: {}, falling back to software H264", gpu_codec),
+                _ => warn!(
+                    "Unknown GPU codec: {}, falling back to software H264",
+                    gpu_codec
+                ),
             }
         }
     }
@@ -645,5 +708,3 @@ fn configure_encoder(
 
     Ok(())
 }
-
-

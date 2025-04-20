@@ -1,57 +1,39 @@
 use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
-use std::process::Command;
+use tauri_plugin_opener::open_path;
 
-
-
-/// Get the logs directory path
+/// Get the logs directory path using Tauri's app_log_dir
 ///
 /// This function returns the path to the logs directory without creating it.
+/// It uses Tauri's app_log_dir which follows platform standards:
+/// - Linux: $XDG_DATA_HOME/{bundleIdentifier}/logs or $HOME/.local/share/{bundleIdentifier}/logs
+/// - macOS: {homeDir}/Library/Logs/{bundleIdentifier}
+/// - Windows: {FOLDERID_LocalAppData}/{bundleIdentifier}/logs
 ///
 /// # Arguments
-/// * `app_handle` - The Tauri application handle, used to get the app data directory
+/// * `app_handle` - The Tauri application handle
 ///
 /// # Returns
 /// * `Result<PathBuf, String>` - The path to the logs directory if successful, or an error
 fn get_logs_directory_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
-    // Get the app data directory
-    let app_data_dir = app_handle.path().app_data_dir()
-        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+    // Sử dụng đường dẫn log tiêu chuẩn của Tauri Logging plugin
+    // Đường dẫn này sẽ tự động được điều chỉnh theo nền tảng
+    let app_data_dir = app_handle
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("Failed to get app log directory: {}", e))?;
 
-    // Return logs directory path
-    Ok(app_data_dir.join("logs"))
+    Ok(app_data_dir)
 }
 
-/// Ensure the logs directory exists
-///
-/// This function creates the logs directory if it doesn't exist.
-/// It's called before initializing the logger to ensure the directory exists.
-///
-/// # Arguments
-/// * `app_handle` - The Tauri application handle, used to get the app data directory
-///
-/// # Returns
-/// * `Result<PathBuf, String>` - The path to the logs directory if successful, or an error
-pub fn ensure_logs_directory(app_handle: &AppHandle) -> Result<PathBuf, String> {
-    // Get app data directory
-    let app_data_dir = app_handle.path().app_data_dir()
-        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
-
-    // Get logs directory path
-    let logs_dir = get_logs_directory_path(app_handle)?;
-
-    // Create logs directory
-    fs::create_dir_all(&logs_dir)
-        .map_err(|e| format!("Failed to create logs directory: {}", e))?;
-
-    // Set APP_DATA_DIR environment variable for log4rs
-    std::env::set_var("APP_DATA_DIR", app_data_dir.to_string_lossy().to_string());
-
-    Ok(logs_dir)
-}
+// ensure_logs_directory function removed as it's no longer needed with tauri-plugin-log
+// The plugin automatically creates the log directory
 
 /// Get the path to the current log file
+///
+/// This function returns the path to the current log file based on the Tauri Logging plugin's
+/// standard paths and file naming conventions.
 ///
 /// # Arguments
 /// * `app_handle` - The Tauri application handle
@@ -78,7 +60,7 @@ pub fn get_current_log_file_path(app_handle: &AppHandle) -> Result<PathBuf, Stri
     Ok(log_file)
 }
 
-/// Open the current log file in the default text editor
+/// Open the current log file in the default text editor using tauri_plugin_opener
 ///
 /// # Arguments
 /// * `app_handle` - The Tauri application handle
@@ -91,38 +73,20 @@ pub fn open_log_file(app_handle: &AppHandle) -> Result<bool, String> {
 
     // Check if the file exists
     if !log_file_path.exists() {
-        return Err(format!("Log file does not exist at: {}", log_file_path.display()));
+        return Err(format!(
+            "Log file does not exist at: {}",
+            log_file_path.display()
+        ));
     }
 
-    // Open the log file with the default application
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("cmd")
-            .args(["/c", "start", "", log_file_path.to_string_lossy().as_ref()])
-            .spawn()
-            .map_err(|e| format!("Failed to open log file: {}", e))?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(log_file_path.to_string_lossy().as_ref())
-            .spawn()
-            .map_err(|e| format!("Failed to open log file: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(log_file_path.to_string_lossy().as_ref())
-            .spawn()
-            .map_err(|e| format!("Failed to open log file: {}", e))?;
-    }
+    // Open the log file with tauri_plugin_opener
+    open_path(log_file_path, None::<&str>)
+        .map_err(|e| format!("Failed to open log file: {}", e))?;
 
     Ok(true)
 }
 
-/// Open the log directory in the file explorer
+/// Open the log directory in the file explorer using tauri_plugin_opener
 ///
 /// # Arguments
 /// * `app_handle` - The Tauri application handle
@@ -138,30 +102,9 @@ pub fn open_log_directory(app_handle: &AppHandle) -> Result<bool, String> {
             .map_err(|e| format!("Failed to create logs directory: {}", e))?;
     }
 
-    // Open the log directory with the default file explorer
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("explorer")
-            .arg(logs_dir.to_string_lossy().as_ref())
-            .spawn()
-            .map_err(|e| format!("Failed to open log directory: {}", e))?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(logs_dir.to_string_lossy().as_ref())
-            .spawn()
-            .map_err(|e| format!("Failed to open log directory: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(logs_dir.to_string_lossy().as_ref())
-            .spawn()
-            .map_err(|e| format!("Failed to open log directory: {}", e))?;
-    }
+    // Open the log directory with tauri_plugin_opener
+    open_path(logs_dir, None::<&str>)
+        .map_err(|e| format!("Failed to open log directory: {}", e))?;
 
     Ok(true)
 }

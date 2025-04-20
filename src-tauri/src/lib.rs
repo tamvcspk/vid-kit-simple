@@ -4,20 +4,35 @@ pub mod state;
 pub mod utils;
 
 use log::info;
-use log4rs;
-use tauri::path::BaseDirectory;
 use tauri::Manager;
+use tauri_plugin_log::{Target, TargetKind, TimezoneStrategy, RotationStrategy};
+
+// Constants for logging configuration
+const MAX_LOG_FILE_SIZE_BYTES: u128 = 10 * 1024 * 1024; // 10 MB
+const LOG_FILE_NAME: &str = "app";
+const LOG_TIMEZONE_STRATEGY: TimezoneStrategy = TimezoneStrategy::UseLocal;
+const LOG_ROTATION_STRATEGY: RotationStrategy = RotationStrategy::KeepAll;
 
 use commands::init_processor_state;
 use state::StateManager;
 use utils::gpu_detector::check_gpu_availability;
-use utils::logger::ensure_logs_directory;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // We'll initialize the logger in setup
     println!("Starting application");
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .timezone_strategy(LOG_TIMEZONE_STRATEGY)
+                .rotation_strategy(LOG_ROTATION_STRATEGY)
+                .max_file_size(MAX_LOG_FILE_SIZE_BYTES)
+                .target(Target::new(TargetKind::Stdout))
+                .target(Target::new(TargetKind::LogDir {
+                    file_name: Some(LOG_FILE_NAME.to_string()),
+                }))
+                .build()
+        )
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -63,17 +78,8 @@ pub fn run() {
             commands::open_log_directory,
         ])
         .setup(|app| {
-            // Initialize logger
+            // Logger is initialized by the tauri-plugin-log plugin
             let app_handle = app.app_handle();
-            let resolver = app.path();
-            ensure_logs_directory(&app_handle).expect("Failed to create logs directory");
-
-            // Initialize log4rs with file path
-            let resource_path = resolver
-                .resolve("config/log4rs.yaml", BaseDirectory::Resource)
-                .expect("Cannot resolve resource");
-            log4rs::init_file(resource_path, Default::default())
-                .expect("Failed to initialize logger");
 
             info!("Application setup starting");
 

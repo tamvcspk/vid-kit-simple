@@ -1,7 +1,7 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 
 // Cấu trúc để parse config.toml
 #[derive(Debug, Default)]
@@ -47,10 +47,10 @@ fn read_config() -> Config {
                                 config.ffmpeg = Some(ffmpeg_config);
                             }
                         }
-                    },
+                    }
                     Err(e) => println!("cargo:warning=Failed to parse config.toml: {}", e),
                 }
-            },
+            }
             Err(e) => println!("cargo:warning=Failed to read config.toml: {}", e),
         }
     } else {
@@ -84,9 +84,12 @@ fn copy_dlls(config: &Config) {
             Ok(path) => {
                 // Chuẩn hóa đường dẫn (thay thế dấu \ bằng /)
                 let normalized_path = path.replace("\\", "/");
-                println!("cargo:warning=Using FFMPEG_DLL_PATH from environment: {}", normalized_path);
+                println!(
+                    "cargo:warning=Using FFMPEG_DLL_PATH from environment: {}",
+                    normalized_path
+                );
                 PathBuf::from(normalized_path)
-            },
+            }
             Err(_) => {
                 println!("cargo:warning=FFMPEG_DLL_PATH not set, using default path");
                 PathBuf::from("C:/vcpkg/installed/x64-windows/bin")
@@ -95,10 +98,16 @@ fn copy_dlls(config: &Config) {
 
         // Kiểm tra xem thư mục có tồn tại không
         if !dll_path.exists() {
-            println!("cargo:warning=FFmpeg DLL directory does not exist: {}", dll_path.display());
+            println!(
+                "cargo:warning=FFmpeg DLL directory does not exist: {}",
+                dll_path.display()
+            );
             println!("cargo:warning=Please install FFmpeg or update FFMPEG_DLL_PATH in .cargo/config.toml");
         } else {
-            println!("cargo:warning=FFmpeg DLL directory found: {}", dll_path.display());
+            println!(
+                "cargo:warning=FFmpeg DLL directory found: {}",
+                dll_path.display()
+            );
             // Liệt kê các file trong thư mục để debug
             if let Ok(entries) = fs::read_dir(&dll_path) {
                 println!("cargo:warning=Files in directory:");
@@ -134,13 +143,21 @@ fn copy_dlls(config: &Config) {
                     if let Some(parent) = dest_path.parent() {
                         if !parent.exists() {
                             if let Err(e) = fs::create_dir_all(parent) {
-                                println!("cargo:warning=Failed to create directory {}: {}", parent.display(), e);
+                                println!(
+                                    "cargo:warning=Failed to create directory {}: {}",
+                                    parent.display(),
+                                    e
+                                );
                             }
                         }
                     }
 
                     match fs::copy(&src_path, &dest_path) {
-                        Ok(_) => println!("cargo:warning=Copied {} to {}", src_path.display(), dest_path.display()),
+                        Ok(_) => println!(
+                            "cargo:warning=Copied {} to {}",
+                            src_path.display(),
+                            dest_path.display()
+                        ),
                         Err(e) => println!("cargo:warning=Failed to copy {}: {}", dll_name, e),
                     }
                 } else {
@@ -153,7 +170,8 @@ fn copy_dlls(config: &Config) {
                             for entry in entries {
                                 if let Ok(entry) = entry {
                                     let file_name = entry.file_name().to_string_lossy().to_string();
-                                    if file_name.starts_with(prefix) && file_name.ends_with(".dll") {
+                                    if file_name.starts_with(prefix) && file_name.ends_with(".dll")
+                                    {
                                         println!("cargo:warning=Found similar DLL: {}", file_name);
                                     }
                                 }
@@ -163,7 +181,10 @@ fn copy_dlls(config: &Config) {
                 }
             }
         } else {
-            println!("cargo:warning=DLL directory not found: {}", dll_path.display());
+            println!(
+                "cargo:warning=DLL directory not found: {}",
+                dll_path.display()
+            );
         }
     } else {
         println!("cargo:warning=No FFmpeg configuration found in config.toml");

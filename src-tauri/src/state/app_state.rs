@@ -1,10 +1,10 @@
 use parking_lot::Mutex;
-use serde::{Serialize, Deserialize};
-use tauri::{State, AppHandle};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, State};
 
-use crate::utils::gpu_detector::GpuInfo;
 use crate::state::errors::StateResult;
 use crate::state::helpers::with_state;
+use crate::utils::gpu_detector::GpuInfo;
 
 // Define AppState structure
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -37,7 +37,12 @@ impl AppStateManager {
     }
 
     // Initialize state with default values
-    pub fn initialize(&self, ffmpeg_version: Option<String>, gpu_available: bool, gpus: Vec<GpuInfo>) {
+    pub fn initialize(
+        &self,
+        ffmpeg_version: Option<String>,
+        gpu_available: bool,
+        gpus: Vec<GpuInfo>,
+    ) {
         // Get lock
         let mut app = self.state.lock();
 
@@ -47,9 +52,15 @@ impl AppStateManager {
         app.gpus = gpus;
 
         // Reset index if needed
-        if !app.gpu_available || app.selected_gpu_index >= 0 &&
-           (app.selected_gpu_index as usize >= app.gpus.len() ||
-            !app.gpus.get(app.selected_gpu_index as usize).map(|g| g.is_available).unwrap_or(false)) {
+        if !app.gpu_available
+            || app.selected_gpu_index >= 0
+                && (app.selected_gpu_index as usize >= app.gpus.len()
+                    || !app
+                        .gpus
+                        .get(app.selected_gpu_index as usize)
+                        .map(|g| g.is_available)
+                        .unwrap_or(false))
+        {
             app.selected_gpu_index = -1; // Reset to CPU
         }
 
@@ -72,13 +83,20 @@ pub fn set_selected_gpu(
     state_manager: State<'_, AppStateManager>,
     app_handle: AppHandle,
 ) -> StateResult<()> {
-    with_state(&state_manager.state, &app_handle, "app-state-changed", |app_state| {
-        // Check if the index is valid
-        if gpu_index == -1 || (gpu_index >= 0 && (gpu_index as usize) < app_state.gpus.len()) {
-            app_state.selected_gpu_index = gpu_index;
-            Ok(())
-        } else {
-            Err(crate::state::errors::StateError::invalid_gpu_index(gpu_index))
-        }
-    })
+    with_state(
+        &state_manager.state,
+        &app_handle,
+        "app-state-changed",
+        |app_state| {
+            // Check if the index is valid
+            if gpu_index == -1 || (gpu_index >= 0 && (gpu_index as usize) < app_state.gpus.len()) {
+                app_state.selected_gpu_index = gpu_index;
+                Ok(())
+            } else {
+                Err(crate::state::errors::StateError::invalid_gpu_index(
+                    gpu_index,
+                ))
+            }
+        },
+    )
 }

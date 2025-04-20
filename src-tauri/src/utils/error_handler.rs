@@ -1,5 +1,5 @@
+use crate::utils::error::{AppError, ErrorCode, ErrorInfo};
 use tauri::AppHandle;
-use crate::utils::error::{AppError, ErrorInfo, ErrorCode};
 
 /// Convert any error to a serializable error info for frontend consumption
 pub fn to_error_info<E: Into<AppError>>(error: E) -> ErrorInfo {
@@ -13,7 +13,7 @@ pub fn string_to_error_info(error: String) -> ErrorInfo {
     ErrorInfo {
         code: ErrorCode::UnknownError,
         message: error.clone(),
-        details: Some(format!("String error: {}", error))
+        details: Some(format!("String error: {}", error)),
     }
 }
 
@@ -23,7 +23,10 @@ pub fn handle_error<T, E: Into<AppError>>(result: Result<T, E>) -> Result<T, Err
 }
 
 /// Handle error and emit event to frontend
-pub fn handle_error_with_event<T, E: Into<AppError>>(result: Result<T, E>, app_handle: &AppHandle) -> Result<T, ErrorInfo> {
+pub fn handle_error_with_event<T, E: Into<AppError>>(
+    result: Result<T, E>,
+    app_handle: &AppHandle,
+) -> Result<T, ErrorInfo> {
     result.map_err(|e| {
         let app_error: AppError = e.into();
         app_error.log_with_event(app_handle);
@@ -37,7 +40,7 @@ macro_rules! handle_command {
     ($expr:expr) => {
         match $expr {
             Ok(val) => Ok(val),
-            Err(err) => Err($crate::utils::error_handler::to_error_info(err))
+            Err(err) => Err($crate::utils::error_handler::to_error_info(err)),
         }
     };
 }
@@ -72,7 +75,9 @@ macro_rules! handle_string_as_error_info {
     ($expr:expr) => {
         match $expr {
             Ok(val) => Ok(val),
-            Err(err) => Err($crate::utils::error_handler::string_to_error_info(err.to_string()))
+            Err(err) => Err($crate::utils::error_handler::string_to_error_info(
+                err.to_string(),
+            )),
         }
     };
 }

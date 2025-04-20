@@ -1,8 +1,8 @@
-use std::sync::{Mutex, MutexGuard};
-use std::fmt::Display;
 use log::{error, warn};
 use parking_lot::Mutex as ParkingMutex;
 use serde::Serialize;
+use std::fmt::Display;
+use std::sync::{Mutex, MutexGuard};
 use tauri::{AppHandle, Emitter};
 
 use crate::state::errors::{StateError, StateResult};
@@ -23,8 +23,9 @@ use crate::state::errors::{StateError, StateResult};
 /// let mutex = Mutex::new(42);
 /// let guard = lock_or_recover(mutex.lock());
 /// ```
-pub fn lock_or_recover<T>(lock_result: std::sync::LockResult<MutexGuard<'_, T>>)
-    -> MutexGuard<'_, T> {
+pub fn lock_or_recover<T>(
+    lock_result: std::sync::LockResult<MutexGuard<'_, T>>,
+) -> MutexGuard<'_, T> {
     match lock_result {
         Ok(guard) => guard,
         Err(poisoned) => {
@@ -117,27 +118,26 @@ pub fn with_state<S, F>(
     mutex: &ParkingMutex<S>,
     app: &AppHandle,
     event: &str,
-    update: F
+    update: F,
 ) -> StateResult<()>
-where 
+where
     S: Clone + Serialize,
-    F: FnOnce(&mut S) -> StateResult<()>
+    F: FnOnce(&mut S) -> StateResult<()>,
 {
     // Get lock (parking_lot::Mutex doesn't return a Result and can't be poisoned)
     let mut state = mutex.lock();
-    
+
     // Update the state
     update(&mut state)?;
-    
+
     // Clone state for emit
     let state_snapshot = state.clone();
-    
+
     // Lock is automatically dropped at the end of scope
-    
+
     // Emit event
-    app.emit(event, state_snapshot)
-        .map_err(StateError::from)?;
-    
+    app.emit(event, state_snapshot).map_err(StateError::from)?;
+
     Ok(())
 }
 
