@@ -1,15 +1,18 @@
 import { useState, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { videoService } from '../../../services';
 import { useError } from '../../../hooks';
 import { ErrorCategory } from '../../../utils';
 import { FileItemData } from '../components/FileList/types';
+import { useFilesStore } from '../../../store';
 
 export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>) => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const { setError, clearError } = useError();
   const dropZoneRef = useRef<HTMLDivElement>(null);
+
+  // Use the new files store
+  const { addFile, updateFile, removeFile, selectFile } = useFilesStore();
 
   // Handle drag and drop
   const handleDragOver = (e: React.DragEvent) => {
@@ -42,21 +45,31 @@ export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>)
 
     // Add each file to global state
     for (const file of videoFiles) {
-      const id = crypto.randomUUID();
-      await invoke('add_file_to_list', {
-        id,
+      const fileId = await addFile({
         name: file.name,
         path: file.path || '',
         size: file.size,
-        fileType: file.type || 'video/mp4',
-        duration: null,
-        resolution: null,
-        thumbnail: null
+        type: file.type || 'video/mp4'
       });
 
-      // Load video info for the first file
+      // Load video info for the file
+      const videoInfo = await loadVideoInfo(file.path || '');
+
+      // Update file with video info
+      if (videoInfo) {
+        await updateFile(fileId, {
+          duration: videoInfo.duration,
+          resolution: videoInfo.resolution ? {
+            width: videoInfo.resolution[0],
+            height: videoInfo.resolution[1]
+          } : undefined,
+          thumbnail: videoInfo.thumbnail
+        });
+      }
+
+      // Select the first file
       if (videoFiles[0] === file) {
-        await loadVideoInfo(file.path || '');
+        await selectFile(fileId);
       }
     }
 
@@ -65,27 +78,36 @@ export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>)
 
   // Add file to list
   const addFileToList = async (filePath: string, fileName: string, fileSize: number, fileType: string) => {
-    const id = crypto.randomUUID();
-
     // Add file to global state
-    await invoke('add_file_to_list', {
-      id,
+    const fileId = await addFile({
       name: fileName,
       path: filePath,
       size: fileSize,
-      fileType: fileType || 'video/mp4',
-      duration: null,
-      resolution: null,
-      thumbnail: null
+      type: fileType || 'video/mp4'
     });
 
     // Load video information
-    await loadVideoInfo(filePath);
+    const videoInfo = await loadVideoInfo(filePath);
+
+    // Update file with video info
+    if (videoInfo) {
+      await updateFile(fileId, {
+        duration: videoInfo.duration,
+        resolution: videoInfo.resolution ? {
+          width: videoInfo.resolution[0],
+          height: videoInfo.resolution[1]
+        } : undefined,
+        thumbnail: videoInfo.thumbnail
+      });
+    }
+
+    // Select the file
+    await selectFile(fileId);
   };
 
   // Handle file selection from list
   const handleFileSelect = async (file: FileItemData) => {
-    await invoke('select_file', { fileId: file.id });
+    await selectFile(file.id);
     await loadVideoInfo(file.path);
   };
 
@@ -123,7 +145,7 @@ export const useFileManagement = (loadVideoInfo: (path: string) => Promise<any>)
   // Remove file from list
   const handleFileRemove = async (file: FileItemData) => {
     // Remove file from global state
-    await invoke('remove_file_from_list', { fileId: file.id });
+    await removeFile(file.id);
   };
 
   return {

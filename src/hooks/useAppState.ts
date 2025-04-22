@@ -1,29 +1,38 @@
-import { useEffect } from "react";
-import useAppStore from "../store/app-state";
+import { useEffect } from 'react';
+import { useAppStore } from '../store';
 
 /**
- * Custom hook to use AppStore
- * Automatically fetches app state when component mounts
+ * Hook to access and manage application state
+ * Automatically loads GPU info when component mounts
  */
 export function useAppState() {
   const {
-    data: appState,
+    activeTab,
+    gpuInfo,
     isLoading,
     error,
-    fetchAppState,
-    setSelectedGpu
+    backendAlive,
+    setActiveTab,
+    loadGpuInfo,
+    setGpuEnabled
   } = useAppStore();
 
-  // Fetch app state when component mounts
+  // Load GPU info on mount
   useEffect(() => {
-    fetchAppState();
-  }, [fetchAppState]);
+    loadGpuInfo();
+  }, [loadGpuInfo]);
 
   return {
-    appState,
-    loading: isLoading,
+    // State
+    activeTab,
+    gpuInfo,
+    isLoading,
     error,
-    refreshAppState: fetchAppState,
-    setSelectedGpu
+    backendAlive,
+
+    // Actions
+    setActiveTab,
+    setGpuEnabled,
+    refreshGpuInfo: loadGpuInfo
   };
 }

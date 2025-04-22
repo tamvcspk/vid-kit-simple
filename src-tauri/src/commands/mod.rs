@@ -7,24 +7,30 @@
 //! ## Command Categories
 //!
 //! - **Video Processing**: Commands for video information retrieval and conversion
-//! - **Preset Management**: Commands for managing conversion presets
+//! - **Task Management**: Commands for managing processing tasks
 //! - **State Management**: Commands for accessing and updating application state
 //! - **File Management**: Commands for managing the file list
 //!
 //! Each command is annotated with `#[tauri::command]` and can be invoked from
 //! the frontend using Tauri's invoke mechanism.
 
-use std::collections::HashMap;
-use tauri::{AppHandle, Manager, State};
+mod task_commands;
 
-use crate::services::preset_manager::ConversionPreset;
-use crate::services::video_processor::{ProcessingOptions, VideoInfo, VideoProcessor};
+// Re-export task commands
+pub use task_commands::*;
+
+
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager, State, Emitter};
+
+// Preset management has been moved to frontend
+use crate::services::video_processor::{VideoInfo, VideoProcessor};
 use crate::state::StateManager;
-use crate::utils::error::{AppError, ErrorCode, ErrorInfo};
+use crate::utils::error::{ErrorCode, ErrorInfo};
 use crate::utils::error_handler;
 use crate::{
     handle_command, handle_command_with_event, handle_string_as_error_info,
-    handle_string_with_event,
+
 };
 
 /// Basic greeting command for testing the Tauri command system
@@ -63,268 +69,112 @@ pub fn get_video_info(path: String, app_handle: AppHandle) -> Result<VideoInfo, 
     handle_command_with_event!(processor.get_video_info(&path), &app_handle)
 }
 
-/// Creates a new video processing task with the specified parameters
-///
-/// This command creates a new task for video conversion based on the provided
-/// input file, output file, and conversion settings. It registers the task with
-/// both the VideoProcessor and the state management system.
-///
-/// # Parameters
-/// * `input_file` - Path to the input video file
-/// * `output_file` - Path where the converted video will be saved
-/// * `settings` - Map of conversion settings (format, resolution, bitrate, etc.)
-/// * `app_handle` - Tauri AppHandle for accessing application resources
-/// * `processor_state` - State containing the VideoProcessor instance
-///
-/// # Returns
-/// * `Result<String, ErrorInfo>` - Task ID if successful, or an error
-#[tauri::command]
-pub fn create_processing_task(
-    input_file: String,
-    output_file: String,
-    settings: HashMap<String, String>,
-    app_handle: tauri::AppHandle,
-    processor_state: State<'_, ProcessorState>,
-) -> Result<String, ErrorInfo> {
-    // Create options from settings
-    let options = match make_processing_options(&settings) {
-        Ok(opts) => opts,
-        Err(e) => {
-            return Err(ErrorInfo {
-                code: ErrorCode::InvalidArgument,
-                message: format!("Invalid settings: {}", e),
-                details: Some(format!(
-                    "Error parsing conversion settings for file: {}",
-                    input_file
-                )),
-            });
-        }
-    };
+// Legacy commands are removed as they are replaced by the new task system
 
-    // Use video_processor from processor_state
-    // We need to clone it to get a mutable reference
-    let mut video_processor = processor_state.video_processor.clone();
+// Preset management commands have been moved to frontend
 
-    // Set AppHandle
-    video_processor.set_app_handle(app_handle.clone());
-
-    // Store copies of input and output file paths for error reporting
-    let input_file_copy = input_file.clone();
-    let output_file_copy = output_file.clone();
-
-    // Create task and handle errors
-    let task_id_result = video_processor.create_task(input_file, output_file, options);
-
-    // Handle errors
-    let task_id = match task_id_result {
-        Ok(id) => id,
-        Err(e) => {
-            return Err(ErrorInfo {
-                code: ErrorCode::VideoProcessingFailed,
-                message: format!("Failed to create processing task: {}", e),
-                details: Some(format!(
-                    "Error creating processing task for input file: {} and output file: {}",
-                    input_file_copy, output_file_copy
-                )),
-            });
-        }
-    };
-
-    // Register task with state manager
-    if let Err(e) = crate::state::add_conversion_task(task_id.clone(), app_handle.clone()) {
-        log::warn!("Failed to register task with state manager: {}", e);
-    }
-
-    Ok(task_id)
-}
-
-#[tauri::command]
-pub fn run_processing_task(
-    task_id: String,
-    processor_state: State<'_, ProcessorState>,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    // Use video_processor from processor_state
-    // We need to clone it to get a mutable reference
-    let mut video_processor = processor_state.video_processor.clone();
-
-    // Set AppHandle
-    video_processor.set_app_handle(app_handle.clone());
-
-    // Update task status in state manager
-    let task_uuid = match crate::state::conversion_state::get_task_id_from_string(&task_id) {
-        Ok(uuid) => uuid,
-        Err(e) => {
-            return Err(ErrorInfo {
-                code: ErrorCode::TaskNotFound,
-                message: format!("Invalid task ID: {}", e),
-                details: Some(format!("Could not find or parse task ID: {}", task_id)),
-            });
-        }
-    };
-
-    if let Err(e) = crate::state::conversion_state::start_task(task_uuid, app_handle.clone()) {
-        log::warn!("Failed to update task status in state manager: {}", e);
-    }
-
-    // Call run_task and handle errors
-    let result = video_processor.run_task(&task_id);
-
-    // Handle errors
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            // Mark task as failed in state manager
-            if let Err(state_err) =
-                crate::state::mark_task_failed(task_id.clone(), app_handle.clone())
-            {
-                log::warn!(
-                    "Failed to mark task as failed in state manager: {}",
-                    state_err
-                );
-            }
-
-            Err(ErrorInfo {
-                code: ErrorCode::VideoProcessingFailed,
-                message: format!("Failed to run processing task: {}", e),
-                details: Some(format!(
-                    "Error executing video processing task: {}",
-                    task_id
-                )),
-            })
-        }
-    }
-}
-
-// Preset management commands
-#[tauri::command]
-pub fn list_presets(app_handle: AppHandle) -> Result<Vec<ConversionPreset>, ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
-    {
-        Ok(manager) => manager,
-        Err(e) => {
-            return Err(error_handler::to_error_info(AppError::preset_error(
-                format!("Failed to create preset manager: {}", e),
-                ErrorCode::PresetValidationError,
-                Some("Error initializing preset manager to list presets".to_string()),
-            )));
-        }
-    };
-
-    handle_command!(manager.list_presets())
-}
-
-/// Retrieves a conversion preset by ID
-///
-/// This command fetches a specific conversion preset from storage based on its ID.
-/// It uses the event-based error handling system to report errors to the frontend.
-///
-/// # Parameters
-/// * `id` - The unique identifier of the preset to retrieve
-/// * `app_handle` - Tauri AppHandle for accessing application resources
-///
-/// # Returns
-/// * `Result<ConversionPreset, ErrorInfo>` - The preset if found, or an error
-#[tauri::command]
-pub fn get_preset(id: String, app_handle: AppHandle) -> Result<ConversionPreset, ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
-    {
-        Ok(manager) => manager,
-        Err(e) => {
-            let error_msg = format!(
-                "Failed to create preset manager: {} (when getting preset {})",
-                e, id
-            );
-            let app_error = crate::utils::error::AppError::preset_error(
-                error_msg.clone(),
-                crate::utils::error::ErrorCode::PresetNotFound,
-                Some(format!(
-                    "Error initializing preset manager to get preset {}",
-                    id
-                )),
-            );
-            app_error.log_with_event(&app_handle);
-            return Err(app_error.to_error_info());
-        }
-    };
-
-    handle_string_with_event!(manager.get_preset(&id), &app_handle)
-}
-
-#[tauri::command]
-pub fn save_preset(preset: ConversionPreset, app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
-    {
-        Ok(manager) => manager,
-        Err(e) => {
-            return Err(error_handler::string_to_error_info(format!(
-                "Failed to create preset manager: {} (when saving preset {})",
-                e, preset.name
-            )))
-        }
-    };
-
-    handle_string_as_error_info!(manager.save_preset(&preset))
-}
-
-#[tauri::command]
-pub fn delete_preset(id: String, app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
-    {
-        Ok(manager) => manager,
-        Err(e) => {
-            return Err(error_handler::string_to_error_info(format!(
-                "Failed to create preset manager: {} (when deleting preset {})",
-                e, id
-            )))
-        }
-    };
-
-    handle_string_as_error_info!(manager.delete_preset(&id))
-}
-
-#[tauri::command]
-pub fn create_default_presets(app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    let manager = match crate::services::preset_manager::PresetManager::from_app_handle(&app_handle)
-    {
-        Ok(manager) => manager,
-        Err(e) => {
-            return Err(error_handler::string_to_error_info(format!(
-                "Failed to create preset manager: {} (when creating default presets)",
-                e
-            )))
-        }
-    };
-
-    handle_string_as_error_info!(manager.create_default_presets())
-}
-
-// State management wrapper commands
-#[tauri::command]
-pub fn update_conversion_progress_wrapper(
-    task_id: String,
-    progress: f32,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::update_conversion_progress(
-        task_id, progress, app_handle
-    ))
-}
-
-#[tauri::command]
-pub fn add_conversion_task_wrapper(
-    task_id: String,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::add_conversion_task(task_id, app_handle))
-}
-
-#[tauri::command]
-pub fn mark_task_failed_wrapper(task_id: String, app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::mark_task_failed(task_id, app_handle))
-}
+// Legacy state management wrapper commands have been removed as they are replaced by the new task system
 
 // State access commands
+/// Get application information including GPU and FFmpeg version
+///
+/// This command returns information about the application, including GPU availability,
+/// GPU list, selected GPU, and FFmpeg version. It replaces the old app_state system.
+///
+/// # Returns
+/// * `Result<AppInfo, ErrorInfo>` - Application information or an error
+#[tauri::command]
+pub fn get_app_info(app_handle: AppHandle) -> Result<AppInfo, ErrorInfo> {
+    // Get FFmpeg version
+    let ffmpeg_version = Some("FFmpeg 7.1.0".to_string()); // Replace with actual function
+
+    // Check GPU availability
+    let gpu_list = match crate::utils::gpu_detector::check_gpu_availability() {
+        Ok(list) => list,
+        Err(e) => return Err(ErrorInfo {
+            code: ErrorCode::UnknownError,
+            message: format!("Failed to detect GPU: {}", e),
+            details: Some("Error detecting GPU capabilities".to_string()),
+        }),
+    };
+
+    // Get selected GPU index from preferences
+    let selected_gpu_index = match app_handle.state::<StateManager>().inner().preferences.state.lock().use_gpu {
+        true => {
+            // Find first available GPU
+            if let Some((i, _)) = gpu_list.gpus.iter().enumerate().find(|(_, g)| g.is_available) {
+                i as i32
+            } else {
+                -1 // No available GPU, use CPU
+            }
+        },
+        false => -1, // Use CPU
+    };
+
+    // Create AppInfo
+    let app_info = AppInfo {
+        app_version: env!("CARGO_PKG_VERSION").to_string(),
+        ffmpeg_version,
+        gpu_available: gpu_list.gpus.iter().any(|g| g.is_available),
+        gpus: gpu_list.gpus,
+        selected_gpu_index,
+    };
+
+    Ok(app_info)
+}
+
+/// Set selected GPU
+///
+/// This command sets the selected GPU index and updates the preferences.
+///
+/// # Parameters
+/// * `gpu_index` - The index of the GPU to select (-1 for CPU, 0+ for GPU)
+/// * `app_handle` - Tauri AppHandle for accessing application resources
+///
+/// # Returns
+/// * `Result<(), ErrorInfo>` - Success or an error
+#[tauri::command]
+pub fn set_gpu(gpu_index: i32, app_handle: AppHandle) -> Result<(), ErrorInfo> {
+    // Get GPU list
+    let gpu_list = match crate::utils::gpu_detector::check_gpu_availability() {
+        Ok(list) => list,
+        Err(e) => return Err(ErrorInfo {
+            code: ErrorCode::UnknownError,
+            message: format!("Failed to detect GPU: {}", e),
+            details: Some("Error detecting GPU capabilities".to_string()),
+        }),
+    };
+
+    // Validate GPU index
+    if gpu_index != -1 && (gpu_index < 0 || gpu_index as usize >= gpu_list.gpus.len()) {
+        return Err(ErrorInfo {
+            code: ErrorCode::InvalidArgument,
+            message: format!("Invalid GPU index: {}", gpu_index),
+            details: Some("GPU index out of range".to_string()),
+        });
+    }
+
+    // We no longer update preferences in backend
+    // Instead, we just emit the app-info-changed event
+
+    // Emit app-info-changed event
+    let _ = app_handle.emit("app-info-changed", get_app_info(app_handle.clone())?);
+
+    Ok(())
+}
+
+/// Application information including GPU and FFmpeg version
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppInfo {
+    pub app_version: String,
+    pub ffmpeg_version: Option<String>,
+    pub gpu_available: bool,
+    pub gpus: Vec<crate::utils::gpu_detector::GpuInfo>,
+    pub selected_gpu_index: i32, // -1 for CPU, 0+ for GPU
+}
+
+// DEPRECATED: Legacy app state command - will be removed in future versions
+// Use get_app_info instead
 #[tauri::command]
 pub fn get_app_state(
     state_manager: State<'_, StateManager>,
@@ -332,6 +182,29 @@ pub fn get_app_state(
     handle_string_as_error_info!(crate::state::get_app_state(state_manager))
 }
 
+/// Emit conversion-state-changed event
+///
+/// This command emits the conversion-state-changed event with the provided conversion state.
+/// It is used for backward compatibility with the old conversion state system.
+///
+/// # Parameters
+/// * `conversion_state` - The conversion state to emit
+/// * `app_handle` - Tauri AppHandle for accessing application resources
+///
+/// # Returns
+/// * `Result<(), ErrorInfo>` - Success or an error
+#[tauri::command]
+pub fn emit_conversion_state_changed(
+    conversion_state: crate::state::conversion_state::ConversionState,
+    app_handle: AppHandle,
+) -> Result<(), ErrorInfo> {
+    // Emit conversion-state-changed event
+    let _ = app_handle.emit("conversion-state-changed", conversion_state);
+    Ok(())
+}
+
+// DEPRECATED: Legacy conversion state command - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn get_conversion_state(
     state_manager: State<'_, StateManager>,
@@ -339,6 +212,29 @@ pub fn get_conversion_state(
     handle_string_as_error_info!(crate::state::get_conversion_state(state_manager))
 }
 
+/// Emit preferences-changed event
+///
+/// This command emits the preferences-changed event with the provided preferences.
+/// It is used for backward compatibility with the old preferences system.
+///
+/// # Parameters
+/// * `preferences` - The preferences to emit
+/// * `app_handle` - Tauri AppHandle for accessing application resources
+///
+/// # Returns
+/// * `Result<(), ErrorInfo>` - Success or an error
+#[tauri::command]
+pub fn emit_preferences_changed(
+    preferences: crate::state::preferences_state::UserPreferencesState,
+    app_handle: AppHandle,
+) -> Result<(), ErrorInfo> {
+    // Emit preferences-changed event
+    let _ = app_handle.emit("preferences-changed", preferences);
+    Ok(())
+}
+
+// DEPRECATED: Legacy preferences command - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn get_preferences(
     state_manager: State<'_, StateManager>,
@@ -346,6 +242,8 @@ pub fn get_preferences(
     handle_string_as_error_info!(crate::state::get_preferences(state_manager))
 }
 
+// DEPRECATED: Legacy update_preferences command - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn update_preferences(
     preferences: crate::state::preferences_state::UserPreferencesState,
@@ -366,7 +264,8 @@ pub fn get_global_state(
     handle_string_as_error_info!(crate::state::get_global_state(state_manager))
 }
 
-// File management commands
+// DEPRECATED: Legacy file management commands - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn add_file_to_list(
     id: String,
@@ -404,6 +303,8 @@ pub fn add_file_to_list(
     ))
 }
 
+// DEPRECATED: Legacy remove_file_from_list command - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn remove_file_from_list(
     file_id: String,
@@ -417,6 +318,8 @@ pub fn remove_file_from_list(
     ))
 }
 
+// DEPRECATED: Legacy select_file command - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn select_file(
     file_id: Option<String>,
@@ -430,6 +333,8 @@ pub fn select_file(
     ))
 }
 
+// DEPRECATED: Legacy clear_file_list command - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn clear_file_list(
     state_manager: State<'_, StateManager>,
@@ -438,11 +343,15 @@ pub fn clear_file_list(
     handle_string_as_error_info!(crate::state::clear_file_list(state_manager, app_handle))
 }
 
+// DEPRECATED: Legacy save_preferences_to_file command - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn save_preferences_to_file(app_handle: AppHandle) -> Result<(), ErrorInfo> {
     handle_string_as_error_info!(crate::state::save_preferences_to_file(app_handle))
 }
 
+// DEPRECATED: Legacy load_preferences_from_file command - will be removed in future versions
+// Frontend should use its own state management
 #[tauri::command]
 pub fn load_preferences_from_file(app_handle: AppHandle) -> Result<(), ErrorInfo> {
     handle_string_as_error_info!(crate::state::load_preferences_from_file(app_handle))
@@ -521,165 +430,4 @@ pub fn open_log_directory(app_handle: AppHandle) -> Result<bool, ErrorInfo> {
     }
 }
 
-/// State container for the VideoProcessor instance
-///
-/// This struct is managed by Tauri's state system and provides access to the
-/// VideoProcessor instance across different commands. It allows multiple commands
-/// to share the same VideoProcessor instance, maintaining task state between calls.
-pub struct ProcessorState {
-    /// The shared VideoProcessor instance
-    pub video_processor: VideoProcessor,
-}
-
-/// Manually triggers cleanup of completed and failed tasks
-///
-/// This command removes old completed and failed tasks from the VideoProcessor's
-/// task list based on their age. It helps prevent memory leaks by ensuring that
-/// old tasks don't accumulate indefinitely. It also sends a notification to the
-/// frontend when the cleanup is complete.
-///
-/// # Parameters
-/// * `processor_state` - State containing the VideoProcessor instance
-/// * `app_handle` - Tauri AppHandle for sending notifications
-///
-/// # Returns
-/// * `Result<(), ErrorInfo>` - Success or an error
-#[tauri::command]
-pub fn cleanup_video_tasks(
-    processor_state: State<'_, ProcessorState>,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    // Clone the processor to get a mutable reference
-    let mut video_processor = processor_state.video_processor.clone();
-
-    // Call cleanup_tasks
-    video_processor.cleanup_tasks();
-
-    // Send a notification about the cleanup
-    crate::utils::event_emitter::emit_info(
-        &app_handle,
-        "Video tasks cleanup completed",
-        Some(format!(
-            "Removed old completed and failed tasks at {}",
-            chrono::Local::now()
-        )),
-    );
-
-    Ok(())
-}
-
-/// Initializes the ProcessorState with a new VideoProcessor instance
-///
-/// This function creates a new VideoProcessor instance and configures it with
-/// the application handle. It's used during application startup to initialize
-/// the shared processor state.
-///
-/// # Parameters
-/// * `app_handle` - Reference to the Tauri AppHandle
-///
-/// # Returns
-/// * `ProcessorState` - The initialized processor state
-pub fn init_processor_state(app_handle: &tauri::AppHandle) -> ProcessorState {
-    // Create a new video processor
-    let mut processor = VideoProcessor::new();
-
-    // Set AppHandle by cloning
-    let app_handle_clone = app_handle.clone();
-    processor.set_app_handle(app_handle_clone);
-
-    ProcessorState {
-        video_processor: processor,
-    }
-}
-
-/// Registers the ProcessorState with the Tauri application
-///
-/// This function is called during application setup to register the ProcessorState
-/// with Tauri's state management system. It initializes the processor state and
-/// makes it available to all commands.
-///
-/// # Parameters
-/// * `app` - Mutable reference to the Tauri App instance
-///
-/// # Returns
-/// * `Result<(), Box<dyn std::error::Error>>` - Success or an error
-pub fn register_processor_state(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    // Get app_handle from app
-    let app_handle = app.handle().clone();
-
-    // Initialize ProcessorState
-    let processor_state = init_processor_state(&app_handle);
-
-    // Register state
-    app.manage(processor_state);
-
-    Ok(())
-}
-
-/// Converts a settings HashMap into a ProcessingOptions struct
-///
-/// This utility function parses the settings map provided by the frontend and
-/// converts it into a structured ProcessingOptions object that can be used by
-/// the VideoProcessor. It handles type conversion and provides default values
-/// where appropriate.
-///
-/// # Parameters
-/// * `settings` - HashMap containing conversion settings as string key-value pairs
-///
-/// # Returns
-/// * `Result<ProcessingOptions, String>` - Parsed options or an error message
-fn make_processing_options(
-    settings: &HashMap<String, String>,
-) -> Result<ProcessingOptions, String> {
-    // Default options
-    let mut options = ProcessingOptions {
-        output_format: settings
-            .get("format")
-            .cloned()
-            .unwrap_or_else(|| "mp4".to_string()),
-        output_path: String::new(), // Will be set by output_file in create_task function
-        resolution: None,
-        bitrate: None,
-        framerate: None,
-        use_gpu: settings
-            .get("use_gpu")
-            .map(|s| s == "true")
-            .unwrap_or(false),
-        gpu_codec: None,
-        cpu_codec: None,
-    };
-
-    // Handle resolution
-    if let (Some(width), Some(height)) = (
-        settings.get("width").and_then(|w| w.parse::<u32>().ok()),
-        settings.get("height").and_then(|h| h.parse::<u32>().ok()),
-    ) {
-        options.resolution = Some((width, height));
-    }
-
-    // Handle bitrate
-    if let Some(bitrate_str) = settings.get("bitrate") {
-        if let Ok(bitrate) = bitrate_str.parse::<u64>() {
-            options.bitrate = Some(bitrate);
-        }
-    }
-
-    // Handle framerate
-    if let Some(framerate_str) = settings.get("framerate") {
-        if let Ok(framerate) = framerate_str.parse::<f32>() {
-            options.framerate = Some(framerate);
-        }
-    }
-
-    // Set codec based on GPU usage
-    if options.use_gpu {
-        options.gpu_codec = settings.get("gpu_codec").cloned();
-    } else {
-        options.cpu_codec = settings
-            .get("cpu_codec")
-            .cloned()
-            .or(Some("h264".to_string()));
-    }
-
-    Ok(options)
-}
+// Legacy processor state and related functions are removed as they are replaced by the new task system

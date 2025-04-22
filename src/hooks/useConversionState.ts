@@ -1,39 +1,96 @@
 import { useEffect } from 'react';
-import useConversionStore from '../store/conversion-state';
+import { useTasksStore, usePresetsStore } from '../store';
 
 /**
- * Custom hook to use ConversionStore
- * Automatically fetches conversion state when component mounts
+ * Hook to access and manage conversion state
+ * Automatically loads tasks and presets when component mounts
  */
 export function useConversionState() {
   const {
-    data: conversionState,
-    isLoading,
-    error,
-    fetchConversionState,
-    addFileToList,
-    removeFileFromList,
-    selectFile,
-    clearFileList,
+    tasks,
+    queue,
+    isLoading: tasksLoading,
+    error: tasksError,
+    loadTasks,
     addTask,
-    markTaskFailed
-  } = useConversionStore();
+    updateTask,
+    removeTask,
+    clearCompletedTasks,
+    reorderTasks,
+    startTask,
+    pauseTask,
+    resumeTask,
+    cancelTask,
+    retryTask,
+    startQueue,
+    pauseQueue,
+    cancelQueue,
+    getTaskById,
+    getPendingTasks,
+    getRunningTasks,
+    getCompletedTasks,
+    getFailedTasks
+  } = useTasksStore();
 
-  // Fetch conversion state when component mounts
+  const {
+    presets,
+    isLoading: presetsLoading,
+    error: presetsError,
+    loadPresets,
+    savePreset,
+    deletePreset,
+    createDefaultPresets,
+    selectPreset,
+    createPreset,
+    duplicatePreset,
+    getPresetById,
+    selectedPresetId
+  } = usePresetsStore();
+
+  // Load tasks and presets on mount
   useEffect(() => {
-    fetchConversionState();
-  }, [fetchConversionState]);
+    loadTasks();
+    loadPresets();
+    createDefaultPresets();
+  }, [loadTasks, loadPresets, createDefaultPresets]);
 
   return {
-    conversionState,
-    loading: isLoading,
-    error,
-    refreshConversionState: fetchConversionState,
-    addFileToList,
-    removeFileFromList,
-    selectFile,
-    clearFileList,
+    // Tasks state and actions
+    tasks,
+    queue,
+    tasksLoading,
+    tasksError,
     addTask,
-    markTaskFailed
+    updateTask,
+    removeTask,
+    clearCompletedTasks,
+    reorderTasks,
+    startTask,
+    pauseTask,
+    resumeTask,
+    cancelTask,
+    retryTask,
+    startQueue,
+    pauseQueue,
+    cancelQueue,
+    getTaskById,
+    getPendingTasks,
+    getRunningTasks,
+    getCompletedTasks,
+    getFailedTasks,
+    refreshTasks: loadTasks,
+
+    // Presets state and actions
+    presets,
+    presetsLoading,
+    presetsError,
+    savePreset,
+    deletePreset,
+    selectPreset,
+    createPreset,
+    duplicatePreset,
+    getPresetById,
+    selectedPresetId,
+    refreshPresets: loadPresets
   };
 }

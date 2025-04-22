@@ -133,7 +133,8 @@ class VideoService extends BaseService {
   }
 
   /**
-   * Start video conversion
+   * Start video conversion (legacy method)
+   * @deprecated Use startTask instead
    */
   async startConversion(taskId: string): Promise<boolean> {
     const result = await this.withErrorHandling(
@@ -142,6 +143,21 @@ class VideoService extends BaseService {
         return true;
       },
       'Failed to start conversion',
+      ErrorCategory.Task
+    );
+    return result === null ? false : result;
+  }
+
+  /**
+   * Start a task using the new task system
+   */
+  async startTask(taskId: string): Promise<boolean> {
+    const result = await this.withErrorHandling(
+      async () => {
+        await invoke<void>('run_task', { taskId });
+        return true;
+      },
+      'Failed to start task',
       ErrorCategory.Task
     );
     return result === null ? false : result;

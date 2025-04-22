@@ -5,7 +5,7 @@ pub mod utils;
 
 use log::info;
 use tauri::Manager;
-use tauri_plugin_log::{Target, TargetKind, TimezoneStrategy, RotationStrategy};
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 // Constants for logging configuration
 const MAX_LOG_FILE_SIZE_BYTES: u128 = 10 * 1024 * 1024; // 10 MB
@@ -13,8 +13,9 @@ const LOG_FILE_NAME: &str = "app";
 const LOG_TIMEZONE_STRATEGY: TimezoneStrategy = TimezoneStrategy::UseLocal;
 const LOG_ROTATION_STRATEGY: RotationStrategy = RotationStrategy::KeepAll;
 
-use commands::init_processor_state;
+
 use state::StateManager;
+use state::task_manager::TaskManager;
 use utils::gpu_detector::check_gpu_availability;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -22,6 +23,7 @@ pub fn run() {
     // We'll initialize the logger in setup
     println!("Starting application");
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .timezone_strategy(LOG_TIMEZONE_STRATEGY)
@@ -31,47 +33,63 @@ pub fn run() {
                 .target(Target::new(TargetKind::LogDir {
                     file_name: Some(LOG_FILE_NAME.to_string()),
                 }))
-                .build()
+                .build(),
         )
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(StateManager::new())
+        .manage(TaskManager::new(2)) // Default to 2 concurrent tasks
         .invoke_handler(tauri::generate_handler![
             // Basic commands
             commands::greet,
             // GPU detection
             check_gpu_availability,
-            // Preset management
-            commands::list_presets,
-            commands::get_preset,
-            commands::save_preset,
-            commands::delete_preset,
-            commands::create_default_presets,
+            // Preset management has been moved to frontend
             // Video processing
             commands::get_video_info,
-            commands::create_processing_task,
-            commands::run_processing_task,
             // State management
+            // New state management commands
+            commands::get_app_info,
+            commands::set_gpu,
+            commands::emit_preferences_changed,
+            commands::emit_conversion_state_changed,
+
+            // DEPRECATED: Legacy state management commands - will be removed in future versions
             commands::get_app_state,
             commands::get_conversion_state,
             commands::get_preferences,
             commands::update_preferences,
-            commands::update_conversion_progress_wrapper,
-            commands::add_conversion_task_wrapper,
-            commands::mark_task_failed_wrapper,
             commands::save_preferences_to_file,
             commands::load_preferences_from_file,
             commands::get_global_state,
-            // File management
+
+            // DEPRECATED: Legacy file management commands - will be removed in future versions
             commands::add_file_to_list,
             commands::remove_file_from_list,
             commands::select_file,
             commands::clear_file_list,
-            // GPU selection
-            commands::set_selected_gpu,
+            // GPU selection - new command is set_gpu
             // Task management
-            commands::cleanup_video_tasks,
+            // New task management commands
+            commands::create_task,
+            commands::run_task,
+            commands::get_tasks,
+            commands::get_queue,
+            commands::get_task,
+            commands::pause_task,
+            commands::resume_task,
+            commands::cancel_task,
+            commands::retry_task,
+            commands::remove_task,
+            commands::clear_completed_tasks,
+            commands::reorder_tasks,
+            commands::pause_queue,
+            commands::resume_queue,
+            commands::cancel_queue,
+            commands::set_max_concurrent_tasks,
+            commands::get_max_concurrent_tasks,
+            commands::is_queue_paused,
             // Logging
             commands::get_current_log_file_path,
             commands::open_log_file,
@@ -79,12 +97,16 @@ pub fn run() {
         ])
         .setup(|app| {
             // Logger is initialized by the tauri-plugin-log plugin
-            let app_handle = app.app_handle();
+            let _app_handle = app.app_handle(); // Unused for now
 
             info!("Application setup starting");
 
-            let processor_state = init_processor_state(&app_handle);
-            app.manage(processor_state);
+            // Processor state is no longer needed with the new task system
+
+            // Initialize task manager state
+            // In a real implementation, we would need to use a mutable reference to TaskManager
+            // For now, we'll just log a message
+            info!("Skipping task state loading (requires mutable access)");
 
             // Get state manager after registering all states
             let state_manager = app.state::<StateManager>();

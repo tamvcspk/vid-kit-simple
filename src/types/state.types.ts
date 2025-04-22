@@ -32,10 +32,7 @@ export interface FileInfo {
 
 // Video conversion state
 export interface ConversionState {
-  active_tasks: string[];
-  completed_tasks: string[];
-  failed_tasks: string[];
-  current_progress: number;
+  // Task management has been moved to tasks.store.ts
   files: FileInfo[];
   selected_file_id: string | null;
 }

@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { videoService, presetService } from '../../../services';
-import { useConversionState } from '../../../hooks/useConversionState';
-import useConversionStore from '../../../store/conversion-state';
+import { videoService } from '../../../services';
 import { useError } from '../../../hooks';
 import { ProcessingOptions } from '../../../types';
 import { ErrorCategory } from '../../../utils';
+import { useTasksStore, usePresetsStore } from '../../../store';
 
 export interface ConversionOptions {
   outputFormat: string;
@@ -20,7 +19,9 @@ export const useConversionLogic = () => {
   const [showSuccessDialog, setShowSuccessDialog] = useState<boolean>(false);
   const [outputPath, setOutputPath] = useState<string>('');
   const { error, setError, clearError } = useError();
-  const { conversionState, addTask, markTaskFailed } = useConversionState();
+
+  // Use the new task store
+  const { addTask } = useTasksStore();
 
   // Start conversion
   const startConversion = async (options: ConversionOptions, files: any[]) => {
@@ -28,8 +29,8 @@ export const useConversionLogic = () => {
     clearError(); // Use clearError instead of setError(null)
 
     try {
-      // 1. Lấy ID của file đang được chọn từ state
-      const selectedFileId = conversionState?.selected_file_id;
+      // 1. Get the selected file ID
+      const selectedFileId = files.find(f => f.selected)?.id;
 
       if (!selectedFileId) {
         setError({ message: 'Please select a file first', category: ErrorCategory.Validation, timestamp: new Date() });
@@ -37,7 +38,7 @@ export const useConversionLogic = () => {
         return;
       }
 
-      // 2. Tìm đối tượng file đầy đủ dựa trên ID
+      // 2. Find the full file object based on ID
       const fileToConvert = files.find(f => f.id === selectedFileId);
 
       if (!fileToConvert || !fileToConvert.path) {
@@ -46,99 +47,84 @@ export const useConversionLogic = () => {
         return;
       }
 
-      // 3. Lấy đường dẫn file đầu vào thực tế
+      // 3. Get the actual input file path
       const inputFilePath = fileToConvert.path;
 
-      // --- Xử lý đường dẫn đầu ra ---
-      // 4. Sử dụng giá trị outputPath từ state
+      // --- Handle output path ---
+      // 4. Use the outputPath value from state
       let finalOutputPath: string = options.outputPath || '';
 
-      // 5. Nếu outputPath chưa có (người dùng chưa chọn hoặc nhập), tạo đường dẫn mặc định
+      // 5. If outputPath is not set, generate a default path
       if (!finalOutputPath) {
-        console.log("Output path not set, generating default..."); // Thêm log để debug
+        console.log("Output path not set, generating default...");
         const generatedPath = await videoService.generateOutputPath(inputFilePath, options.outputFormat);
         if (generatedPath) {
           finalOutputPath = generatedPath;
-          console.log("Generated default output path:", finalOutputPath); // Thêm log để debug
+          console.log("Generated default output path:", finalOutputPath);
         }
 
-        // Nếu vẫn không tạo được đường dẫn mặc định -> lỗi
+        // If we still can't generate a default path -> error
         if (!finalOutputPath) {
           setError({ message: 'Could not generate default output path', category: ErrorCategory.Task, timestamp: new Date() });
           setIsConverting(false);
           return;
         }
-        // Cập nhật state của form trên UI
+        // Update the form state on UI
         setOutputPath(finalOutputPath);
       }
-      // --- Kết thúc xử lý đường dẫn đầu ra ---
+      // --- End output path handling ---
 
-      // 6. Đảm bảo đường dẫn đầu ra có phần mở rộng phù hợp với định dạng đầu ra
+      // 6. Ensure the output path has the appropriate extension for the output format
       if (!finalOutputPath.toLowerCase().endsWith(`.${options.outputFormat.toLowerCase()}`)) {
-        // Nếu đường dẫn không kết thúc bằng phần mở rộng phù hợp, thêm vào
+        // If the path doesn't end with the appropriate extension, add it
         finalOutputPath = `${finalOutputPath}.${options.outputFormat}`;
         console.log("Added extension to output path:", finalOutputPath);
       }
 
-      // Xây dựng đối tượng options cho backend
+      // Build the options object for the backend
       const processingOptions: ProcessingOptions = {
         output_format: options.outputFormat,
         output_path: finalOutputPath,
-        resolution: options.resolution !== 'original' ? presetService.resolutionToArray(options.resolution) : undefined,
-        bitrate: options.bitrate ? options.bitrate * 1000 : undefined, // Giả sử backend cần bps
+        resolution: options.resolution !== 'original' ? parseResolution(options.resolution) : undefined,
+        bitrate: options.bitrate ? options.bitrate * 1000 : undefined, // Assuming backend needs bps
         framerate: options.fps !== 'original' ? parseFloat(options.fps) : undefined,
         use_gpu: options.use_gpu,
-        gpu_codec: undefined, // Sẽ được set bên dưới nếu use_gpu là true
-        cpu_codec: undefined, // Sẽ được set bên dưới nếu use_gpu là false
+        gpu_codec: undefined, // Will be set below if use_gpu is true
+        cpu_codec: undefined, // Will be set below if use_gpu is false
       };
 
-      // 7. Xác định codec dựa trên lựa chọn GPU/CPU
+      // 7. Determine codec based on GPU/CPU choice
       if (processingOptions.use_gpu) {
         processingOptions.gpu_codec = await videoService.getGpuCodec(processingOptions.output_format);
-        console.log("Using GPU codec:", processingOptions.gpu_codec); // Thêm log để debug
+        console.log("Using GPU codec:", processingOptions.gpu_codec);
       } else {
         processingOptions.cpu_codec = videoService.getCpuCodec(processingOptions.output_format);
-        console.log("Using CPU codec:", processingOptions.cpu_codec); // Thêm log để debug
+        console.log("Using CPU codec:", processingOptions.cpu_codec);
       }
 
-      // 8. Gọi service để tạo task ở backend với đường dẫn và options chính xác
-      console.log("Creating conversion task with input:", inputFilePath, "and options:", processingOptions); // Thêm log để debug
-      const taskId = await videoService.createConversionTask(inputFilePath, processingOptions);
+      // 8. Call the service to create a task in the backend with the correct path and options
+      console.log("Creating conversion task with input:", inputFilePath, "and options:", processingOptions);
 
-      // 9. Xử lý kết quả tạo task và bắt đầu chạy task
+      // Create a task using the new task store
+      const taskId = await addTask({
+        input_path: inputFilePath,
+        output_path: finalOutputPath,
+        config: convertOptionsToConfig(processingOptions),
+        type: 'convert'
+      });
+
       if (taskId) {
-        console.log("Task created with ID:", taskId); // Thêm log để debug
-        await addTask(taskId);
-        const success = await videoService.startConversion(taskId);
-        if (success) {
-          console.log("Conversion started successfully for task:", taskId); // Thêm log để debug
-          // Logic xử lý tiến độ... (giữ nguyên)
-          // Sử dụng store trực tiếp để lấy state mới nhất
-          const checkProgress = setInterval(() => {
-            // Lấy trạng thái chuyển đổi hiện tại trực tiếp từ store
-            const currentState = useConversionStore.getState().data;
-            if (currentState) {
-              // Tìm đúng task nếu có nhiều task? Hoặc giả định chỉ có 1 task chạy?
-              // Hiện tại đang dựa vào current_progress chung
-              const taskProgress = currentState.current_progress; // Hoặc tìm progress của task cụ thể
-              console.log(`Task ${taskId} progress: ${taskProgress}`); // Thêm log để debug
-              if (taskProgress >= 100) {
-                clearInterval(checkProgress);
-                setIsConverting(false);
-                setShowSuccessDialog(true);
-                setOutputPath(processingOptions.output_path); // Có thể không cần thiết nếu đã set ở trên
-                console.log("Conversion complete for task:", taskId); // Thêm log để debug
-              }
-            }
-          }, 1000); // Tăng interval lên 1 giây để giảm log
-        } else {
-          console.error("Failed to start conversion for task:", taskId); // Thêm log để debug
-          markTaskFailed(taskId);
-          setError({ message: 'Cannot start conversion process', category: ErrorCategory.Task, timestamp: new Date() });
-          setIsConverting(false);
-        }
+        console.log("Task created with ID:", taskId);
+
+        // Start the task
+        await videoService.startTask(taskId);
+
+        // Show success dialog when task is complete
+        // This will be handled by the task store events
+        setShowSuccessDialog(true);
+        setIsConverting(false);
       } else {
-        console.error("Failed to create conversion task."); // Thêm log để debug
+        console.error("Failed to create conversion task.");
         setError({ message: 'Cannot create conversion task', category: ErrorCategory.Task, timestamp: new Date() });
         setIsConverting(false);
       }
@@ -165,6 +151,64 @@ export const useConversionLogic = () => {
       setError({ message: 'Error loading video information', category: ErrorCategory.Task, timestamp: new Date() });
       return null;
     }
+  };
+
+  // Helper function to parse resolution string to [width, height]
+  const parseResolution = (resolution: string): [number, number] | undefined => {
+    if (resolution === 'original') return undefined;
+
+    // Handle preset resolutions
+    switch (resolution) {
+      case '4K':
+        return [3840, 2160];
+      case '1080p':
+        return [1920, 1080];
+      case '720p':
+        return [1280, 720];
+      case '480p':
+        return [854, 480];
+      case '360p':
+        return [640, 360];
+      default:
+        // Try to parse custom resolution (format: "1920x1080")
+        const match = resolution.match(/(\d+)x(\d+)/);
+        if (match) {
+          return [parseInt(match[1]), parseInt(match[2])];
+        }
+        return undefined;
+    }
+  };
+
+  // Helper function to convert ProcessingOptions to config map
+  const convertOptionsToConfig = (options: ProcessingOptions): Record<string, string> => {
+    const config: Record<string, string> = {
+      output_format: options.output_format,
+      output_path: options.output_path,
+      use_gpu: options.use_gpu ? 'true' : 'false',
+    };
+
+    if (options.resolution) {
+      config.width = options.resolution[0].toString();
+      config.height = options.resolution[1].toString();
+    }
+
+    if (options.bitrate) {
+      config.bitrate = options.bitrate.toString();
+    }
+
+    if (options.framerate) {
+      config.framerate = options.framerate.toString();
+    }
+
+    if (options.gpu_codec) {
+      config.gpu_codec = options.gpu_codec;
+    }
+
+    if (options.cpu_codec) {
+      config.cpu_codec = options.cpu_codec;
+    }
+
+    return config;
   };
 
   return {

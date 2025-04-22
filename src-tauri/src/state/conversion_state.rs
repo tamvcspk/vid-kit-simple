@@ -1,33 +1,13 @@
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
 use crate::state::errors::{StateError, StateResult};
 use crate::state::helpers::with_state;
 
-/// Task status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum TaskStatus {
-    Pending,
-    Running,
-    Completed,
-    Failed,
-    Cancelled,
-}
-
-/// Task information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskState {
-    pub id: Uuid,
-    pub progress: f32,
-    pub status: TaskStatus,
-    pub file_id: Option<Uuid>,
-    pub output_path: Option<PathBuf>,
-    pub error_message: Option<String>,
-}
+// Legacy task status and task state have been removed as they are replaced by the new task system
 
 /// Video file information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,7 +25,7 @@ pub struct FileInfo {
 /// General state for conversion
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ConversionState {
-    pub tasks: HashMap<Uuid, TaskState>,
+    // tasks field has been removed as it is replaced by the new task system
     pub files: Vec<FileInfo>,
     pub selected_file_id: Option<Uuid>,
 }
@@ -59,7 +39,6 @@ impl ConversionStateManager {
     pub fn new() -> Self {
         Self {
             state: Mutex::new(ConversionState {
-                tasks: HashMap::new(),
                 files: Vec::new(),
                 selected_file_id: None,
             }),
@@ -74,144 +53,15 @@ pub fn get_conversion_state(
     Ok(state_manager.state.lock().clone())
 }
 
-pub fn update_conversion_progress(
-    task_id: Uuid,
-    progress: f32,
-    app_handle: AppHandle,
-) -> StateResult<()> {
-    let state_manager = app_handle.state::<ConversionStateManager>();
+// Legacy update_conversion_progress function has been removed as it is replaced by the new task system
 
-    with_state(
-        &state_manager.state,
-        &app_handle,
-        "conversion-state-changed",
-        |state| {
-            // Update task progress
-            let task = state
-                .tasks
-                .get_mut(&task_id)
-                .ok_or(StateError::task_not_found(task_id))?;
-            task.progress = progress;
+// Legacy add_conversion_task function has been removed as it is replaced by the new task system
 
-            // Update task status if completed
-            if progress >= 100.0 {
-                task.status = TaskStatus::Completed;
-            }
+// Legacy start_task function has been removed as it is replaced by the new task system
 
-            Ok(())
-        },
-    )?;
+// Legacy mark_task_failed function has been removed as it is replaced by the new task system
 
-    // Prepare progress data for specific event
-    #[derive(Serialize, Clone)]
-    struct Progress {
-        task_id: String,
-        progress: f32,
-    }
-
-    let progress_data = Progress {
-        task_id: task_id.to_string(),
-        progress,
-    };
-
-    // Emit task-specific progress event
-    app_handle
-        .emit("conversion-progress", progress_data)
-        .map_err(StateError::from)?;
-
-    Ok(())
-}
-
-pub fn add_conversion_task(file_id: Option<Uuid>, app_handle: AppHandle) -> StateResult<Uuid> {
-    let state_manager = app_handle.state::<ConversionStateManager>();
-    let task_id = Uuid::new_v4();
-
-    with_state(
-        &state_manager.state,
-        &app_handle,
-        "conversion-state-changed",
-        |state| {
-            let task = TaskState {
-                id: task_id,
-                progress: 0.0,
-                status: TaskStatus::Pending,
-                file_id,
-                output_path: None,
-                error_message: None,
-            };
-
-            state.tasks.insert(task_id, task);
-            Ok(())
-        },
-    )?;
-
-    Ok(task_id)
-}
-
-pub fn start_task(task_id: Uuid, app_handle: AppHandle) -> StateResult<()> {
-    let state_manager = app_handle.state::<ConversionStateManager>();
-
-    with_state(
-        &state_manager.state,
-        &app_handle,
-        "conversion-state-changed",
-        |state| {
-            let task = state
-                .tasks
-                .get_mut(&task_id)
-                .ok_or(StateError::task_not_found(task_id))?;
-            task.status = TaskStatus::Running;
-            Ok(())
-        },
-    )
-}
-
-pub fn mark_task_failed(
-    task_id: Uuid,
-    error_message: Option<String>,
-    app_handle: AppHandle,
-) -> StateResult<()> {
-    let state_manager = app_handle.state::<ConversionStateManager>();
-
-    with_state(
-        &state_manager.state,
-        &app_handle,
-        "conversion-state-changed",
-        |state| {
-            let task = state
-                .tasks
-                .get_mut(&task_id)
-                .ok_or(StateError::task_not_found(task_id))?;
-            task.status = TaskStatus::Failed;
-            task.error_message = error_message;
-            Ok(())
-        },
-    )
-}
-
-pub fn mark_task_completed(
-    task_id: Uuid,
-    output_path: PathBuf,
-    app_handle: AppHandle,
-) -> StateResult<()> {
-    let state_manager = app_handle.state::<ConversionStateManager>();
-
-    with_state(
-        &state_manager.state,
-        &app_handle,
-        "conversion-state-changed",
-        |state| {
-            let task = state
-                .tasks
-                .get_mut(&task_id)
-                .ok_or(StateError::task_not_found(task_id))?;
-            task.status = TaskStatus::Completed;
-            task.progress = 100.0;
-            task.output_path = Some(output_path);
-            Ok(())
-        },
-    )
-}
+// Legacy mark_task_completed function has been removed as it is replaced by the new task system
 
 // File management functions
 pub fn add_file_to_list(
@@ -317,12 +167,7 @@ pub fn clear_file_list(
     )
 }
 
-// Functions to convert String <-> Uuid for backward compatibility
-pub fn get_task_id_from_string(task_id_str: &str) -> StateResult<Uuid> {
-    Uuid::parse_str(task_id_str)
-        .map_err(|_| StateError::other(format!("Invalid task ID: {}", task_id_str)))
-}
-
+// Function to convert String -> Uuid for backward compatibility
 pub fn get_file_id_from_string(file_id_str: &str) -> StateResult<Uuid> {
     Uuid::parse_str(file_id_str)
         .map_err(|_| StateError::other(format!("Invalid file ID: {}", file_id_str)))

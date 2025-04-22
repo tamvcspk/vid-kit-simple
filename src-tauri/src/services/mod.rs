@@ -13,6 +13,4 @@
 /// and task management using FFmpeg
 pub mod video_processor;
 
-/// Preset management service that handles saving, loading, and managing
-/// conversion presets stored as JSON files
-pub mod preset_manager;
+// preset_manager has been moved to frontend

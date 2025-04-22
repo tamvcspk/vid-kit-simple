@@ -33,6 +33,9 @@ pub mod helpers;
 /// User preferences and application settings state
 pub mod preferences_state;
 
+/// Task management system for processing video tasks
+pub mod task_manager;
+
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
@@ -162,65 +165,11 @@ pub fn get_conversion_state(
     Ok(state_manager.conversion.state.lock().clone())
 }
 
-pub fn update_conversion_progress(
-    task_id: String,
-    progress: f32,
-    app_handle: AppHandle,
-) -> StateResult<()> {
-    // Convert from String to Uuid for backward compatibility
-    let task_uuid = conversion_state::get_task_id_from_string(&task_id)?;
-    conversion_state::update_conversion_progress(task_uuid, progress, app_handle)
-}
+// Legacy update_conversion_progress function has been removed as it is replaced by the new task system
 
-/// Adds a new conversion task to the state
-///
-/// This function creates a new task in the conversion state and associates it
-/// with the given task ID. It emits a state change event to notify the frontend.
-///
-/// # Parameters
-/// * `task_id` - String identifier for the task (for backward compatibility)
-/// * `app_handle` - Tauri AppHandle for accessing state and emitting events
-///
-/// # Returns
-/// * `StateResult<()>` - Success or an error
-pub fn add_conversion_task(
-    task_id: String, // Keep this parameter for backward compatibility
-    app_handle: AppHandle,
-) -> StateResult<()> {
-    // Convert task_id from String to Uuid
-    let task_uuid = match uuid::Uuid::parse_str(&task_id) {
-        Ok(uuid) => Some(uuid),
-        Err(_) => None, // If parsing fails, assume null
-    };
+// Legacy add_conversion_task function has been removed as it is replaced by the new task system
 
-    // Get the state manager from the app handle
-    let state_manager = app_handle.state::<ConversionStateManager>();
-
-    // Create a new task in the conversion state
-    with_state(
-        &state_manager.state,
-        &app_handle,
-        "conversion-state-changed",
-        |state| {
-            let task = conversion_state::TaskState {
-                id: uuid::Uuid::new_v4(),
-                progress: 0.0,
-                status: conversion_state::TaskStatus::Pending,
-                file_id: task_uuid,
-                output_path: None,
-                error_message: None,
-            };
-
-            state.tasks.insert(task.id, task.clone());
-            Ok(()) // Return unit type to match the expected return type
-        },
-    )
-}
-
-pub fn mark_task_failed(task_id: String, app_handle: AppHandle) -> StateResult<()> {
-    let task_uuid = conversion_state::get_task_id_from_string(&task_id)?;
-    conversion_state::mark_task_failed(task_uuid, None, app_handle)
-}
+// Legacy mark_task_failed function has been removed as it is replaced by the new task system
 
 pub fn add_file_to_list(
     file_info: conversion_state::FileInfo,

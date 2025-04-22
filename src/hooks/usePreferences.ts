@@ -1,33 +1,62 @@
 import { useEffect } from 'react';
-import useActualPreferencesStore from '../store/preferences-state';
+import { useConfigStore } from '../store';
 
 /**
- * Custom hook to use PreferencesStore
- * Automatically fetches preferences state when component mounts
+ * Hook to access and manage application preferences
+ * Automatically loads configuration when component mounts
  */
 export function usePreferences() {
   const {
-    data: preferences,
+    outputFolder,
+    maxParallelJobs,
+    retryLimit,
+    selectedGpu,
+    theme,
+    defaultFormat,
+    useGpu,
     isLoading,
     error,
-    fetchPreferencesState,
-    updatePreferences,
-    savePreferencesToFile,
-    loadPreferencesFromFile
-  } = useActualPreferencesStore();
+    loadConfig,
+    saveConfig,
+    resetConfig,
+    setTheme,
+    setOutputFolder,
+    setMaxParallelJobs,
+    setRetryLimit,
+    setSelectedGpu,
+    setDefaultFormat,
+    setUseGpu
+  } = useConfigStore();
 
-  // Fetch preferences state when component mounts
+  // Load config on mount
   useEffect(() => {
-    fetchPreferencesState();
-  }, [fetchPreferencesState]);
+    loadConfig();
+  }, [loadConfig]);
 
   return {
-    preferences,
-    loading: isLoading,
+    // State
+    preferences: {
+      outputFolder,
+      maxParallelJobs,
+      retryLimit,
+      selectedGpu,
+      theme,
+      defaultFormat,
+      useGpu
+    },
+    isLoading,
     error,
-    refreshPreferences: fetchPreferencesState,
-    updatePreferences,
-    savePreferencesToFile,
-    loadPreferencesFromFile
+
+    // Actions
+    updatePreferences: saveConfig,
+    resetPreferences: resetConfig,
+    setTheme,
+    setOutputFolder,
+    setMaxParallelJobs,
+    setRetryLimit,
+    setSelectedGpu,
+    setDefaultFormat,
+    setUseGpu,
+    refreshPreferences: loadConfig
   };
 }

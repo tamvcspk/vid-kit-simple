@@ -3,6 +3,10 @@ import { devtools } from 'zustand/middleware';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { UserPreferencesState } from '../types/state.types';
+import { useConfigStore } from './config.store';
+
+// This store is now a wrapper around config.store.ts for backward compatibility
+// New code should use config.store.ts directly
 
 // Define interface for PreferencesStore
 interface PreferencesStore {
@@ -17,6 +21,10 @@ interface PreferencesStore {
   updatePreferences: (preferences: UserPreferencesState) => Promise<void>;
   savePreferencesToFile: () => Promise<void>;
   loadPreferencesFromFile: () => Promise<void>;
+
+  // Helper methods
+  getDefaultPreferences: () => UserPreferencesState;
+  convertConfigToPreferences: () => UserPreferencesState | null;
 }
 
 // Create store with devtools middleware
@@ -31,13 +39,48 @@ const usePreferencesStore = create<PreferencesStore>()(
       // Actions
       setPreferencesState: (preferencesState) => set({ data: preferencesState }),
 
+      getDefaultPreferences: () => ({
+        default_output_dir: null,
+        default_format: 'mp4',
+        use_gpu: false,
+        theme: 'light'
+      }),
+
+      // Convert config store data to preferences format
+      convertConfigToPreferences: () => {
+        const config = useConfigStore.getState();
+        if (!config) return null;
+
+        return {
+          default_output_dir: config.outputFolder || null,
+          default_format: config.defaultFormat,
+          use_gpu: config.useGpu,
+          theme: config.theme
+        };
+      },
+
       fetchPreferencesState: async () => {
         try {
           set({ isLoading: true });
-          const preferencesState = await invoke<UserPreferencesState>('get_preferences');
-          set({ data: preferencesState, error: null });
+
+          // Load from config store
+          await useConfigStore.getState().loadConfig();
+
+          // Convert to preferences format
+          const preferences = usePreferencesStore.getState().convertConfigToPreferences();
+
+          // Set state
+          set({ data: preferences, error: null });
+
+          // Emit event for backward compatibility
+          if (preferences) {
+            await invoke('emit_preferences_changed', { preferences });
+          }
         } catch (error) {
           set({ error: `Failed to fetch preferences state: ${error}` });
+          // Use default preferences if all else fails
+          const defaultPrefs = usePreferencesStore.getState().getDefaultPreferences();
+          set({ data: defaultPrefs });
         } finally {
           set({ isLoading: false });
         }
@@ -45,8 +88,22 @@ const usePreferencesStore = create<PreferencesStore>()(
 
       updatePreferences: async (preferences) => {
         try {
-          await invoke('update_preferences', { newPreferences: preferences });
-          // State will be updated through event listener
+          // Update local state
+          set({ data: preferences });
+
+          // Convert to config format
+          const config = {
+            outputFolder: preferences.default_output_dir || '',
+            defaultFormat: preferences.default_format,
+            useGpu: preferences.use_gpu,
+            theme: preferences.theme as 'light' | 'dark'
+          };
+
+          // Save to config store
+          await useConfigStore.getState().saveConfig(config);
+
+          // Emit event for backward compatibility
+          await invoke('emit_preferences_changed', { preferences });
         } catch (error) {
           set({ error: `Failed to update preferences: ${error}` });
         }
@@ -54,7 +111,19 @@ const usePreferencesStore = create<PreferencesStore>()(
 
       savePreferencesToFile: async () => {
         try {
-          await invoke('save_preferences_to_file');
+          // This is now handled by config store
+          const preferences = usePreferencesStore.getState().data;
+          if (!preferences) return;
+
+          // Convert to config format and save
+          const config = {
+            outputFolder: preferences.default_output_dir || '',
+            defaultFormat: preferences.default_format,
+            useGpu: preferences.use_gpu,
+            theme: preferences.theme as 'light' | 'dark'
+          };
+
+          await useConfigStore.getState().saveConfig(config);
         } catch (error) {
           set({ error: `Failed to save preferences to file: ${error}` });
         }
@@ -62,8 +131,19 @@ const usePreferencesStore = create<PreferencesStore>()(
 
       loadPreferencesFromFile: async () => {
         try {
-          await invoke('load_preferences_from_file');
-          // State will be updated through event listener
+          // This is now handled by config store
+          await useConfigStore.getState().loadConfig();
+
+          // Convert to preferences format
+          const preferences = usePreferencesStore.getState().convertConfigToPreferences();
+
+          // Set state
+          if (preferences) {
+            set({ data: preferences });
+
+            // Emit event for backward compatibility
+            await invoke('emit_preferences_changed', { preferences });
+          }
         } catch (error) {
           set({ error: `Failed to load preferences from file: ${error}` });
         }

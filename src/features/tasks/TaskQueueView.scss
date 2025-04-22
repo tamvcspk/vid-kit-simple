@@ -1,0 +1,47 @@
+.task-queue-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1rem;
+  
+  .task-queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    
+    h1 {
+      margin: 0;
+    }
+    
+    .task-queue-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+  
+  .task-queue-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    
+    .task-stat-card {
+      flex: 1;
+      text-align: center;
+      
+      .p-card-title {
+        font-size: 1rem;
+      }
+      
+      .task-stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+      }
+    }
+  }
+  
+  .task-list-wrapper {
+    flex: 1;
+    overflow: auto;
+  }
+}

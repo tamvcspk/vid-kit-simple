@@ -11,7 +11,7 @@ const CLEANUP_INTERVAL = 5 * 60 * 1000;
 export function startTaskCleanupScheduler(): void {
   // Run cleanup immediately
   cleanupTasks();
-  
+
   // Set up interval for periodic cleanup
   setInterval(cleanupTasks, CLEANUP_INTERVAL);
 }
@@ -21,7 +21,7 @@ export function startTaskCleanupScheduler(): void {
  */
 async function cleanupTasks(): Promise<void> {
   try {
-    await invoke('cleanup_video_tasks');
+    await invoke('clear_completed_tasks');
     console.log('Task cleanup completed');
   } catch (error) {
     console.error('Failed to clean up tasks:', error);

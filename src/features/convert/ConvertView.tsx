@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../../hooks/useAppState';
-import { useConversionState } from '../../hooks/useConversionState';
+import { useTasksStore, useFilesStore } from '../../store';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useError } from '../../hooks';
 import { videoService } from '../../services';
@@ -29,7 +29,8 @@ declare global {
 const ConvertView: React.FC = () => {
   // Get global state
   const { appState } = useAppState();
-  const { conversionState } = useConversionState();
+  const { tasks } = useTasksStore();
+  const { files: fileList, selectedFileId } = useFilesStore();
   const { preferences } = usePreferences();
 
   // State for conversion options
@@ -79,12 +80,8 @@ const ConvertView: React.FC = () => {
     saveCurrentPreset
   } = usePresetManagement();
 
-  // Get files and selected file from global state
-  const rawFiles = conversionState?.files || [];
-  const selectedFile = conversionState?.selected_file_id || null;
-
-  // Convert state files to FileItemData[]
-  const files: FileItemData[] = rawFiles.map(file => ({
+  // Convert store files to FileItemData[]
+  const files: FileItemData[] = fileList.map(file => ({
     id: file.id,
     name: file.name,
     path: file.path,
@@ -92,7 +89,8 @@ const ConvertView: React.FC = () => {
     fileType: file.type, // Map 'type' to 'fileType'
     duration: file.duration,
     resolution: file.resolution ? [file.resolution.width, file.resolution.height] : null,
-    thumbnail: file.thumbnail
+    thumbnail: file.thumbnail,
+    selected: file.selected
   }));
 
   // Initialize settings from preferences and check GPU availability
@@ -158,7 +156,7 @@ const ConvertView: React.FC = () => {
         let defaultFileName = 'output_converted';
 
         // If input file is selected, use its name as the base
-        const selectedFileObj = files.find(f => f.id === selectedFile);
+        const selectedFileObj = files.find(f => f.id === selectedFileId);
         if (selectedFileObj && selectedFileObj.name) {
           const fileNameWithoutExt = selectedFileObj.name.split('.')[0];
           if (fileNameWithoutExt) {
@@ -184,7 +182,7 @@ const ConvertView: React.FC = () => {
         {/* Left column - File list */}
         <FileList
           files={files}
-          selectedFileId={selectedFile}
+          selectedFileId={selectedFileId}
           isDragging={isDragging}
           isUploading={isUploading}
           dropZoneRef={dropZoneRef}
@@ -199,7 +197,7 @@ const ConvertView: React.FC = () => {
         {/* Right column - Settings panel */}
         <ConversionForm
           error={error}
-          selectedFile={selectedFile}
+          selectedFile={selectedFileId}
         >
           <SettingsPanel
             presets={availablePresets}
@@ -211,7 +209,7 @@ const ConvertView: React.FC = () => {
             framerate={parseInt(fps) || 30}
             use_gpu={use_gpu}
             isConverting={isConverting}
-            conversionProgress={conversionState ? conversionState.current_progress : 0}
+            conversionProgress={0} // TODO: Get progress from task store
             showAdvanced={showAdvanced}
             onPresetChange={handlePresetChange}
             onOutputFormatChange={(format) => setOutputFormat(format)}

@@ -24,6 +24,7 @@ pub enum ErrorCode {
     StateSerializationError = 3002,
     TaskNotFound = 3003,
     FileNotFound3 = 3004,
+    TaskCanceled = 3005,
 
     // Preset management errors (4000-4999)
     PresetNotFound = 4000,
@@ -202,6 +203,19 @@ impl AppError {
 
     /// Create a new generic error
     pub fn other_error(
+        message: impl Into<String>,
+        code: ErrorCode,
+        context: Option<String>,
+    ) -> Self {
+        AppError::OtherError {
+            message: message.into(),
+            code,
+            context,
+        }
+    }
+
+    /// Create a new error (generic function for compatibility)
+    pub fn new(
         message: impl Into<String>,
         code: ErrorCode,
         context: Option<String>,

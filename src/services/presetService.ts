@@ -1,8 +1,9 @@
-import { invoke } from '@tauri-apps/api/core';
 import { BaseService } from './baseService';
 import { ProcessingOptions } from '../types/video.types';
 import { Preset } from '../types/preset.types';
 import { ErrorCategory } from '../utils';
+import { usePresetsStore } from '../store/presets.store';
+import { ConversionPreset } from '../types/store.types';
 
 // Preset service for managing conversion presets
 
@@ -11,14 +12,15 @@ class PresetService extends BaseService {
    * Get list of all presets
    */
   async listPresets(): Promise<Preset[]> {
-    const result = await this.withErrorHandling(
+    return this.withErrorHandling(
       async () => {
-        return await invoke<Preset[]>('list_presets');
+        // Load presets from store
+        await usePresetsStore.getState().loadPresets();
+        return usePresetsStore.getState().presets as unknown as Preset[];
       },
       'Failed to get preset list',
       ErrorCategory.Preset
-    );
-    return result || [];
+    ) || [];
   }
 
   /**
@@ -27,7 +29,13 @@ class PresetService extends BaseService {
   async getPreset(name: string): Promise<Preset | null> {
     return this.withErrorHandling(
       async () => {
-        return await invoke<Preset>('get_preset', { id: name });
+        // Load presets if not loaded
+        if (usePresetsStore.getState().presets.length === 0) {
+          await usePresetsStore.getState().loadPresets();
+        }
+        // Find preset by name
+        const preset = usePresetsStore.getState().presets.find(p => p.name === name);
+        return preset as unknown as Preset;
       },
       `Failed to get preset "${name}"`,
       ErrorCategory.Preset
@@ -48,7 +56,24 @@ class PresetService extends BaseService {
   async savePreset(preset: Preset): Promise<boolean> {
     const result = await this.withErrorHandling(
       async () => {
-        await invoke<void>('save_preset', { preset });
+        // Convert Preset to ConversionPreset
+        const conversionPreset: ConversionPreset = {
+          id: preset.name, // Use name as ID for backward compatibility
+          name: preset.name,
+          description: preset.description,
+          output_format: preset.options.outputFormat,
+          resolution: this.convertResolution(preset.options),
+          bitrate: preset.options.bitrate,
+          fps: preset.options.framerate ? parseInt(preset.options.framerate) : undefined,
+          codec: preset.options.codec,
+          use_gpu: preset.options.use_gpu,
+          audio_codec: 'aac', // Default
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        // Save to store
+        await usePresetsStore.getState().savePreset(conversionPreset);
         return true;
       },
       `Failed to save preset "${preset.name}"`,
@@ -87,7 +112,12 @@ class PresetService extends BaseService {
   async deletePreset(name: string): Promise<boolean> {
     const result = await this.withErrorHandling(
       async () => {
-        await invoke<void>('delete_preset', { name });
+        // Find preset by name
+        const preset = usePresetsStore.getState().presets.find(p => p.name === name);
+        if (!preset) return false;
+
+        // Delete from store
+        await usePresetsStore.getState().deletePreset(preset.id);
         return true;
       },
       `Failed to delete preset "${name}"`,
@@ -102,13 +132,25 @@ class PresetService extends BaseService {
   async createDefaultPresets(): Promise<boolean> {
     const result = await this.withErrorHandling(
       async () => {
-        await invoke<void>('create_default_presets');
+        await usePresetsStore.getState().createDefaultPresets();
         return true;
       },
       'Failed to create default presets',
       ErrorCategory.Preset
     );
     return result === null ? false : result;
+  }
+
+  /**
+   * Convert ProcessingOptions resolution to ConversionPreset resolution
+   */
+  private convertResolution(options: ProcessingOptions): any {
+    if (!options.resolution || options.resolution === 'original') {
+      return { type: 'original' };
+    }
+
+    const [width, height] = this.resolutionToArray(options.resolution) || [1280, 720];
+    return { type: 'preset', width, height };
   }
 
   /**

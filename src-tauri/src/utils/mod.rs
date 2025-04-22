@@ -11,6 +11,7 @@
 //! - `error_handler`: Provides error handling functions and macros
 //! - `event_emitter`: Utilities for emitting events to the frontend
 //! - `logger`: Provides utilities for accessing log files created by the Tauri Logging plugin
+//! - `store_helper`: Utilities for working with the Tauri Store plugin
 
 /// GPU detection utility that identifies available GPUs and their capabilities
 /// for hardware-accelerated video processing
@@ -28,3 +29,6 @@ pub mod event_emitter;
 
 /// Utilities for accessing log files created by the Tauri Logging plugin
 pub mod logger;
+
+/// Utilities for working with the Tauri Store plugin
+pub mod store_helper;

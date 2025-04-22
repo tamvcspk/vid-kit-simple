@@ -36,6 +36,8 @@ uuid = { version = "1.16.0", features = ["v4"] }
 thiserror = "2.0.12"
 threadpool = "1.8.1"
 num_cpus = "1.16.0"
+tauri-plugin-store = "2"
+tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 tempfile = "3.8.1"

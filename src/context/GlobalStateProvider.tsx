@@ -1,7 +1,5 @@
 import { ReactNode, useEffect } from 'react';
-import useAppStore from '../store/app-state';
-import useConversionStore from '../store/conversion-state';
-import usePreferencesStore from '../store/preferences-state';
+import { useAppStore, useConfigStore, useConversionStore, usePresetsStore, useTasksStore } from '../store';
 
 interface GlobalStateProviderProps {
   children: ReactNode;
@@ -9,21 +7,25 @@ interface GlobalStateProviderProps {
 
 export function GlobalStateProvider({ children }: GlobalStateProviderProps) {
   // Get fetch state functions from stores
-  const fetchAppState = useAppStore(state => state.fetchAppState);
-  const fetchConversionState = useConversionStore(state => state.fetchConversionState);
-  const fetchPreferencesState = usePreferencesStore(state => state.fetchPreferencesState);
+  const { loadGpuInfo } = useAppStore();
+  const { loadConfig } = useConfigStore();
+  const { fetchConversionState } = useConversionStore();
+  const { loadPresets } = usePresetsStore();
+  const { loadTasks } = useTasksStore();
 
   // Initialize state when component mounts
   useEffect(() => {
     // Fetch all states
     Promise.all([
-      fetchAppState(),
+      loadGpuInfo(),
+      loadConfig(),
       fetchConversionState(),
-      fetchPreferencesState()
+      loadPresets(),
+      loadTasks()
     ]).catch(error => {
       console.error('Failed to initialize state:', error);
     });
-  }, [fetchAppState, fetchConversionState, fetchPreferencesState]);
+  }, [loadGpuInfo, loadConfig, fetchConversionState, loadPresets, loadTasks]);
 
   return <>{children}</>;
 }

@@ -36,6 +36,7 @@
         }
       ]
     },
-    "log:default"
+    "log:default",
+    "store:default"
   ]
 }
