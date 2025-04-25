@@ -1,5 +1,5 @@
 import { ReactNode, useEffect } from 'react';
-import { useAppStore, useConfigStore, useConversionStore, usePresetsStore, useTasksStore } from '../store';
+import { useAppStore, useConfigStore, useFilesStore, usePresetsStore, useTasksStore } from '../store';
 
 interface GlobalStateProviderProps {
   children: ReactNode;
@@ -9,7 +9,7 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps) {
   // Get fetch state functions from stores
   const { loadGpuInfo } = useAppStore();
   const { loadConfig } = useConfigStore();
-  const { fetchConversionState } = useConversionStore();
+  const { loadFiles } = useFilesStore();
   const { loadPresets } = usePresetsStore();
   const { loadTasks } = useTasksStore();
 
@@ -19,13 +19,13 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps) {
     Promise.all([
       loadGpuInfo(),
       loadConfig(),
-      fetchConversionState(),
+      loadFiles(),
       loadPresets(),
       loadTasks()
     ]).catch(error => {
       console.error('Failed to initialize state:', error);
     });
-  }, [loadGpuInfo, loadConfig, fetchConversionState, loadPresets, loadTasks]);
+  }, [loadGpuInfo, loadConfig, loadFiles, loadPresets, loadTasks]);
 
   return <>{children}</>;
 }

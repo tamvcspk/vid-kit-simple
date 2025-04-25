@@ -1,6 +1,7 @@
-import useNotificationStore, { 
-  NotificationType, 
-  addErrorNotification 
+import {
+  useNotificationStore,
+  NotificationType,
+  addErrorNotification
 } from '../store/notification-store';
 
 /**
@@ -75,7 +76,7 @@ export function useNotifications() {
     unreadCount,
     showPanel,
     filter,
-    
+
     // Actions
     addNotification,
     addInfo,

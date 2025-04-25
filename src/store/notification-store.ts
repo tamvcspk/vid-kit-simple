@@ -38,7 +38,7 @@ interface NotificationStore {
   setFilter: (filter: NotificationType | 'all') => void;
 }
 
-const useNotificationStore = create<NotificationStore>()(
+export const useNotificationStore = create<NotificationStore>()(
   devtools(
     (set) => ({
       // Initial state
@@ -178,4 +178,3 @@ export const addErrorNotification = (error: AppError): void => {
   });
 };
 
-export default useNotificationStore;

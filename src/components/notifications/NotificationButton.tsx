@@ -1,6 +1,6 @@
 import { Button } from 'primereact/button';
 import styled from '@emotion/styled';
-import useNotificationStore from '../../store/notification-store';
+import { useNotificationStore } from '../../store/notification-store';
 
 const NotificationButtonContainer = styled.div`
   position: relative;

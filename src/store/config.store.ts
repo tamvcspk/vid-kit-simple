@@ -46,7 +46,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   loadConfig: async () => {
     set({ isLoading: true, error: null });
     try {
-      const store = new Store(CONFIG_STORE_PATH);
+      const store = await Store.load(CONFIG_STORE_PATH);
       const config = await store.get(CONFIG_STORE_KEYS.CONFIG) as Partial<ConfigState> || {};
 
       // Merge with default values for any missing properties
@@ -55,6 +55,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
         ...config,
         isLoading: false
       });
+
+      console.log('Configuration loaded');
     } catch (error) {
       console.error('Failed to load config:', error);
       set({ error: String(error), isLoading: false });
@@ -64,7 +66,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   saveConfig: async (config) => {
     set({ isLoading: true, error: null });
     try {
-      const store = new Store(CONFIG_STORE_PATH);
+      const store = await Store.load(CONFIG_STORE_PATH);
       const currentState = get();
 
       // Create a new config object with the current state and the new values
@@ -94,7 +96,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   resetConfig: async () => {
     set({ isLoading: true, error: null });
     try {
-      const store = new Store(CONFIG_STORE_PATH);
+      const store = await Store.load(CONFIG_STORE_PATH);
 
       // Save default config to store
       await store.set(CONFIG_STORE_KEYS.CONFIG, DEFAULT_CONFIG);

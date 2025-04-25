@@ -18,13 +18,13 @@ pub enum ErrorCode {
     DecodingError = 2003,
     FormatError = 2004,
 
-    // State management errors (3000-3999)
-    StateAccessError = 3000,
-    StateMutationError = 3001,
-    StateSerializationError = 3002,
-    TaskNotFound = 3003,
-    FileNotFound3 = 3004,
-    TaskCanceled = 3005,
+    // Task management errors (3000-3999)
+    TaskNotFound = 3000,
+    TaskCanceled = 3001,
+    TaskProcessingFailed = 3002,
+    StateMutationError = 3003,
+    StateAccessError = 3004,
+    StateSerializationError = 3005,
 
     // Preset management errors (4000-4999)
     PresetNotFound = 4000,
@@ -71,13 +71,6 @@ pub enum AppError {
         context: Option<String>,
     },
 
-    #[error("State Error: {message}")]
-    StateError {
-        message: String,
-        code: ErrorCode,
-        context: Option<String>,
-    },
-
     #[error("Preset Error: {message}")]
     PresetError {
         message: String,
@@ -113,8 +106,8 @@ pub enum AppError {
         context: Option<String>,
     },
 
-    #[error("State error: {0}")]
-    DomainStateError(#[from] crate::state::errors::StateError),
+    #[error("Task error: {0}")]
+    TaskError(crate::state::task_manager::TaskError),
 }
 
 impl AppError {
@@ -140,13 +133,13 @@ impl AppError {
         }
     }
 
-    /// Create a new state error
+    /// Create a new state error (for backward compatibility)
     pub fn state_error(
         message: impl Into<String>,
         code: ErrorCode,
         context: Option<String>,
     ) -> Self {
-        AppError::StateError {
+        AppError::OtherError {
             message: message.into(),
             code,
             context,
@@ -232,13 +225,12 @@ impl AppError {
         match self {
             AppError::IoError { code, .. } => *code,
             AppError::FFmpegError { code, .. } => *code,
-            AppError::StateError { code, .. } => *code,
             AppError::PresetError { code, .. } => *code,
             AppError::VideoProcessingError { code, .. } => *code,
             AppError::GpuError { code, .. } => *code,
             AppError::ValidationError { code, .. } => *code,
             AppError::OtherError { code, .. } => *code,
-            AppError::DomainStateError(_) => ErrorCode::StateAccessError,
+            AppError::TaskError(_) => ErrorCode::TaskNotFound,
         }
     }
 
@@ -250,13 +242,12 @@ impl AppError {
             details: match self {
                 AppError::IoError { context, .. } => context.clone(),
                 AppError::FFmpegError { context, .. } => context.clone(),
-                AppError::StateError { context, .. } => context.clone(),
                 AppError::PresetError { context, .. } => context.clone(),
                 AppError::VideoProcessingError { context, .. } => context.clone(),
                 AppError::GpuError { context, .. } => context.clone(),
                 AppError::ValidationError { context, .. } => context.clone(),
                 AppError::OtherError { context, .. } => context.clone(),
-                AppError::DomainStateError(_) => None,
+                AppError::TaskError(_) => Some("Error in task management".to_string()),
             },
         }
     }
@@ -271,11 +262,6 @@ impl AppError {
                 }
             }
             AppError::FFmpegError { context, .. } => {
-                if let Some(ctx) = context {
-                    eprintln!("Context: {}", ctx);
-                }
-            }
-            AppError::StateError { context, .. } => {
                 if let Some(ctx) = context {
                     eprintln!("Context: {}", ctx);
                 }
@@ -305,8 +291,8 @@ impl AppError {
                     eprintln!("Context: {}", ctx);
                 }
             }
-            AppError::DomainStateError(err) => {
-                eprintln!("State Error Context: {:?}", err);
+            AppError::TaskError(err) => {
+                eprintln!("Task Error Context: {:?}", err);
             }
         }
     }
@@ -449,7 +435,7 @@ impl From<crate::services::video_processor::VideoError> for AppError {
                     context: Some("Thread pool error during video processing".to_string()),
                 }
             }
-            crate::services::video_processor::VideoError::State(e) => AppError::DomainStateError(e),
+            crate::services::video_processor::VideoError::Task(e) => AppError::TaskError(e),
             crate::services::video_processor::VideoError::Other(msg) => AppError::OtherError {
                 message: msg,
                 code: ErrorCode::VideoProcessingFailed,

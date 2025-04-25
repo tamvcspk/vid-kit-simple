@@ -6,6 +6,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { v4 as uuidv4 } from 'uuid';
 
+// Create a store instance
+let storePromise: Promise<Store> | null = null;
+
+// Function to get the store instance
+const getStore = async (): Promise<Store> => {
+  if (!storePromise) {
+    storePromise = Store.load(TASKS_STORE_PATH);
+  }
+  return storePromise;
+};
+
 interface TasksState {
   tasks: Task[];
   queue: string[]; // Array of task IDs in queue order
@@ -14,6 +25,7 @@ interface TasksState {
 
   // Actions
   loadTasks: () => Promise<void>;
+  refreshTasks: () => Promise<void>; // Added refreshTasks method
   addTask: (task: Omit<Task, 'id' | 'status' | 'progress' | 'attempts' | 'created_at'>) => Promise<string>;
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
   removeTask: (id: string) => Promise<void>;
@@ -50,14 +62,71 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   is_queue_paused: false,
 
   // Actions
+  refreshTasks: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      // Fetch latest tasks from backend
+      await invoke('get_tasks')
+        .then((backendTasks: any) => {
+          if (backendTasks && Array.isArray(backendTasks)) {
+            // Update local state with backend tasks
+            set({ tasks: backendTasks, isLoading: false });
+            console.log('Tasks refreshed from backend');
+
+            // Save to store
+            const store = getStore();
+            store.then(s => {
+              s.set(TASKS_STORE_KEYS.TASKS, backendTasks);
+              s.save();
+            });
+
+            // Also get the queue
+            invoke<string[]>('get_queue')
+              .then((queue) => {
+                set({ queue });
+
+                // Save to store
+                store.then(s => {
+                  s.set(TASKS_STORE_KEYS.QUEUE, queue);
+                  s.save();
+                });
+              })
+              .catch(error => {
+                console.error('Failed to refresh queue from backend:', error);
+              });
+          }
+        })
+        .catch(error => {
+          console.error('Failed to refresh tasks from backend:', error);
+          // Fall back to loading from store
+          get().loadTasks();
+        });
+    } catch (error) {
+      console.error('Failed to refresh tasks:', error);
+      set({ error: String(error), isLoading: false });
+
+      // Fall back to loading from store
+      get().loadTasks();
+    }
+  },
+
   loadTasks: async () => {
     set({ isLoading: true, error: null });
     try {
-      const store = new Store(TASKS_STORE_PATH);
+      const store = await getStore();
       const tasks = await store.get(TASKS_STORE_KEYS.TASKS) as Task[] || [];
       const queue = await store.get(TASKS_STORE_KEYS.QUEUE) as string[] || [];
 
-      set({ tasks, queue, isLoading: false });
+      // Try to get queue paused state from backend
+      try {
+        const is_queue_paused = await invoke<boolean>('is_queue_paused');
+        set({ tasks, queue, is_queue_paused, isLoading: false });
+      } catch (error) {
+        // If backend call fails, use stored value or default to false
+        set({ tasks, queue, isLoading: false });
+      }
+
+      console.log('Tasks loaded');
 
       // Set up event listeners for task updates
       const unlistenTaskProgress = await listen('task-progress', (event) => {
@@ -83,11 +152,18 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         });
       });
 
+      // Listen for queue state changes
+      const unlistenQueueStateChanged = await listen('queue-state-changed', (event) => {
+        const { is_paused } = event.payload as { is_paused: boolean };
+        set({ is_queue_paused: is_paused });
+      });
+
       // Clean up listeners when component unmounts
       window.addEventListener('beforeunload', () => {
         unlistenTaskProgress();
         unlistenTaskCompleted();
         unlistenTaskFailed();
+        unlistenQueueStateChanged();
       });
 
     } catch (error) {
@@ -99,7 +175,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   addTask: async (taskData) => {
     set({ isLoading: true, error: null });
     try {
-      const store = new Store(TASKS_STORE_PATH);
+      const store = await getStore();
 
       const task: Task = {
         id: uuidv4(),
@@ -153,7 +229,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       tasks[index] = { ...tasks[index], ...updates };
 
       // Save to store
-      const store = new Store(TASKS_STORE_PATH);
+      const store = await getStore();
       await store.set(TASKS_STORE_KEYS.TASKS, tasks);
       await store.save();
 
@@ -173,7 +249,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       const queue = get().queue.filter(taskId => taskId !== id);
 
       // Save to store
-      const store = new Store(TASKS_STORE_PATH);
+      const store = await getStore();
       await store.set(TASKS_STORE_KEYS.TASKS, tasks);
       await store.set(TASKS_STORE_KEYS.QUEUE, queue);
       await store.save();
@@ -200,7 +276,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       );
 
       // Save to store
-      const store = new Store(TASKS_STORE_PATH);
+      const store = await getStore();
       await store.set(TASKS_STORE_KEYS.TASKS, tasks);
       await store.set(TASKS_STORE_KEYS.QUEUE, queue);
       await store.save();
@@ -225,7 +301,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       }
 
       // Save to store
-      const store = new Store(TASKS_STORE_PATH);
+      const store = await getStore();
       await store.set(TASKS_STORE_KEYS.QUEUE, newOrder);
       await store.save();
 
@@ -292,7 +368,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       set({ queue });
 
       // Update store
-      const store = new Store(TASKS_STORE_PATH);
+      const store = await getStore();
       await store.set(TASKS_STORE_KEYS.QUEUE, queue);
       await store.save();
     } catch (error) {
@@ -322,7 +398,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         set({ queue });
 
         // Update store
-        const store = new Store(TASKS_STORE_PATH);
+        const store = await getStore();
         await store.set(TASKS_STORE_KEYS.QUEUE, queue);
         await store.save();
       }
@@ -397,7 +473,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       set({ tasks: updatedTasks, queue: [] });
 
       // Update store
-      const store = new Store(TASKS_STORE_PATH);
+      const store = await getStore();
       await store.set(TASKS_STORE_KEYS.TASKS, updatedTasks);
       await store.set(TASKS_STORE_KEYS.QUEUE, []);
       await store.save();

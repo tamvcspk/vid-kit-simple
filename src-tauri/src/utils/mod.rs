@@ -7,6 +7,7 @@
 //! ## Available Utilities
 //!
 //! - `gpu_detector`: Detects GPU capabilities and available hardware acceleration
+//! - `app_info`: Provides application information including GPU and FFmpeg version
 //! - `error`: Defines error types and error handling utilities
 //! - `error_handler`: Provides error handling functions and macros
 //! - `event_emitter`: Utilities for emitting events to the frontend
@@ -16,6 +17,9 @@
 /// GPU detection utility that identifies available GPUs and their capabilities
 /// for hardware-accelerated video processing
 pub mod gpu_detector;
+
+/// Application information provider including GPU and FFmpeg version
+pub mod app_info;
 
 /// Error types and utilities for standardized error handling across the application
 pub mod error;

@@ -15,7 +15,7 @@ import { EditView } from './features/edit';
 import { SanitizeView } from './features/sanitize';
 import { TaskQueueView } from './features/tasks';
 
-import { Footer } from './components/layout/Footer';
+import { Footer } from './components/layout/Footer/Footer';
 import { ErrorBoundary, AppInitializer } from './components/common';
 
 // Helper function to convert tab name to index

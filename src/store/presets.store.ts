@@ -1,8 +1,19 @@
 import { create } from 'zustand';
-import { LazyStore } from '@tauri-apps/plugin-store';
+import { Store } from '@tauri-apps/plugin-store';
 import { ConversionPreset } from '../types/store.types';
 import { PRESETS_STORE_PATH, PRESETS_STORE_KEYS } from '../constants/stores';
 import { v4 as uuidv4 } from 'uuid';
+
+// Create a store instance
+let storePromise: Promise<Store> | null = null;
+
+// Function to get the store instance
+const getStore = async (): Promise<Store> => {
+  if (!storePromise) {
+    storePromise = Store.load(PRESETS_STORE_PATH);
+  }
+  return storePromise;
+};
 
 interface PresetsState {
   presets: ConversionPreset[];
@@ -31,9 +42,10 @@ export const usePresetsStore = create<PresetsState>((set, get) => ({
   loadPresets: async () => {
     set({ isLoading: true, error: null });
     try {
-      const store = new LazyStore(PRESETS_STORE_PATH);
+      const store = await getStore();
       const presets = await store.get(PRESETS_STORE_KEYS.PRESETS) as ConversionPreset[] || [];
       set({ presets, isLoading: false });
+      console.log('Presets loaded');
     } catch (error) {
       console.error('Failed to load presets:', error);
       set({ error: String(error), isLoading: false });
@@ -43,7 +55,7 @@ export const usePresetsStore = create<PresetsState>((set, get) => ({
   savePreset: async (preset) => {
     set({ isLoading: true, error: null });
     try {
-      const store = new LazyStore(PRESETS_STORE_PATH);
+      const store = await getStore();
       const presets = [...get().presets];
       const index = presets.findIndex(p => p.id === preset.id);
 
@@ -65,7 +77,7 @@ export const usePresetsStore = create<PresetsState>((set, get) => ({
   deletePreset: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      const store = new LazyStore(PRESETS_STORE_PATH);
+      const store = await getStore();
       const presets = get().presets.filter(p => p.id !== id);
       await store.set(PRESETS_STORE_KEYS.PRESETS, presets);
       await store.save();

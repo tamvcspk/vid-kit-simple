@@ -31,8 +31,8 @@ pub enum VideoError {
     #[error("Thread pool error: {0}")]
     ThreadPool(String),
 
-    #[error("State error: {0}")]
-    State(#[from] crate::state::errors::StateError),
+    #[error("Task error: {0}")]
+    Task(#[from] crate::state::task_manager::TaskError),
 
     #[error("{0}")]
     Other(String),

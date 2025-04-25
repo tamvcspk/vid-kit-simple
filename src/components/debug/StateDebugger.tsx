@@ -1,27 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
-import useAppStore from '../../store/app-state';
-import useConversionStore from '../../store/conversion-state';
-import usePreferencesStore from '../../store/preferences-state';
+import { useAppStore, useFilesStore, useConfigStore } from '../../store';
 import { ErrorDisplay } from '../common';
 import { createError, ErrorCategory } from '../../utils';
 
 export function StateDebugger() {
   const [visible, setVisible] = useState(false);
 
-  // Sử dụng các store riêng biệt
-  const appState = useAppStore(state => state.data);
-  const appLoading = useAppStore(state => state.isLoading);
-  const appError = useAppStore(state => state.error);
+  // Chỉ lấy state khi dialog hiển thị để tránh re-render không cần thiết
+  const [stateSnapshot, setStateSnapshot] = useState<{
+    appState: any;
+    filesState: { files: any[]; selectedFileId: string | null };
+    filesLoading: boolean;
+    filesError: string | null;
+    configState: any;
+    configLoading: boolean;
+    configError: string | null;
+  }>({
+    appState: {},
+    filesState: { files: [], selectedFileId: null },
+    filesLoading: false,
+    filesError: null,
+    configState: {},
+    configLoading: false,
+    configError: null
+  });
 
-  const conversionState = useConversionStore(state => state.data);
-  const conversionLoading = useConversionStore(state => state.isLoading);
-  const conversionError = useConversionStore(state => state.error);
-
-  const preferencesState = usePreferencesStore(state => state.data);
-  const preferencesLoading = usePreferencesStore(state => state.isLoading);
-  const preferencesError = usePreferencesStore(state => state.error);
+  // Cập nhật state snapshot khi dialog mở
+  useEffect(() => {
+    if (visible) {
+      setStateSnapshot({
+        appState: useAppStore.getState(),
+        filesState: {
+          files: useFilesStore.getState().files,
+          selectedFileId: useFilesStore.getState().selectedFileId
+        },
+        filesLoading: useFilesStore.getState().isLoading,
+        filesError: useFilesStore.getState().error,
+        configState: useConfigStore.getState(),
+        configLoading: useConfigStore.getState().isLoading,
+        configError: useConfigStore.getState().error
+      });
+    }
+  }, [visible]);
 
   return (
     <>
@@ -41,32 +63,26 @@ export function StateDebugger() {
         maximizable
       >
         <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
-          <h3>App State {appLoading && '(Loading...)'}</h3>
-          {appError && (
-            <ErrorDisplay
-              error={createError(ErrorCategory.State, appError)}
-              showDismissButton={false}
-            />
-          )}
-          <pre>{JSON.stringify(appState, null, 2)}</pre>
+          <h3>App State</h3>
+          <pre>{JSON.stringify(stateSnapshot.appState, null, 2)}</pre>
 
-          <h3>Conversion State {conversionLoading && '(Loading...)'}</h3>
-          {conversionError && (
+          <h3>Files State {stateSnapshot.filesLoading && '(Loading...)'}</h3>
+          {stateSnapshot.filesError && (
             <ErrorDisplay
-              error={createError(ErrorCategory.Task, conversionError)}
+              error={createError(ErrorCategory.Task, stateSnapshot.filesError)}
               showDismissButton={false}
             />
           )}
-          <pre>{JSON.stringify(conversionState, null, 2)}</pre>
+          <pre>{JSON.stringify(stateSnapshot.filesState, null, 2)}</pre>
 
-          <h3>Preferences {preferencesLoading && '(Loading...)'}</h3>
-          {preferencesError && (
+          <h3>Config State {stateSnapshot.configLoading && '(Loading...)'}</h3>
+          {stateSnapshot.configError && (
             <ErrorDisplay
-              error={createError(ErrorCategory.Other, preferencesError)}
+              error={createError(ErrorCategory.Other, stateSnapshot.configError)}
               showDismissButton={false}
             />
           )}
-          <pre>{JSON.stringify(preferencesState, null, 2)}</pre>
+          <pre>{JSON.stringify(stateSnapshot.configState, null, 2)}</pre>
         </div>
       </Dialog>
     </>

@@ -20,18 +20,12 @@ mod task_commands;
 pub use task_commands::*;
 
 
-use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State, Emitter};
+use tauri::{AppHandle, Emitter};
 
 // Preset management has been moved to frontend
 use crate::services::video_processor::{VideoInfo, VideoProcessor};
-use crate::state::StateManager;
 use crate::utils::error::{ErrorCode, ErrorInfo};
-use crate::utils::error_handler;
-use crate::{
-    handle_command, handle_command_with_event, handle_string_as_error_info,
-
-};
+use crate::handle_command_with_event;
 
 /// Basic greeting command for testing the Tauri command system
 ///
@@ -84,43 +78,15 @@ pub fn get_video_info(path: String, app_handle: AppHandle) -> Result<VideoInfo, 
 /// # Returns
 /// * `Result<AppInfo, ErrorInfo>` - Application information or an error
 #[tauri::command]
-pub fn get_app_info(app_handle: AppHandle) -> Result<AppInfo, ErrorInfo> {
-    // Get FFmpeg version
-    let ffmpeg_version = Some("FFmpeg 7.1.0".to_string()); // Replace with actual function
-
-    // Check GPU availability
-    let gpu_list = match crate::utils::gpu_detector::check_gpu_availability() {
-        Ok(list) => list,
-        Err(e) => return Err(ErrorInfo {
+pub fn get_app_info(_app_handle: AppHandle) -> Result<crate::utils::app_info::AppInfo, ErrorInfo> {
+    match crate::utils::app_info::get_app_info() {
+        Ok(app_info) => Ok(app_info),
+        Err(e) => Err(ErrorInfo {
             code: ErrorCode::UnknownError,
-            message: format!("Failed to detect GPU: {}", e),
-            details: Some("Error detecting GPU capabilities".to_string()),
+            message: format!("Failed to get app info: {}", e),
+            details: Some("Error getting application information".to_string()),
         }),
-    };
-
-    // Get selected GPU index from preferences
-    let selected_gpu_index = match app_handle.state::<StateManager>().inner().preferences.state.lock().use_gpu {
-        true => {
-            // Find first available GPU
-            if let Some((i, _)) = gpu_list.gpus.iter().enumerate().find(|(_, g)| g.is_available) {
-                i as i32
-            } else {
-                -1 // No available GPU, use CPU
-            }
-        },
-        false => -1, // Use CPU
-    };
-
-    // Create AppInfo
-    let app_info = AppInfo {
-        app_version: env!("CARGO_PKG_VERSION").to_string(),
-        ffmpeg_version,
-        gpu_available: gpu_list.gpus.iter().any(|g| g.is_available),
-        gpus: gpu_list.gpus,
-        selected_gpu_index,
-    };
-
-    Ok(app_info)
+    }
 }
 
 /// Set selected GPU
@@ -135,51 +101,37 @@ pub fn get_app_info(app_handle: AppHandle) -> Result<AppInfo, ErrorInfo> {
 /// * `Result<(), ErrorInfo>` - Success or an error
 #[tauri::command]
 pub fn set_gpu(gpu_index: i32, app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    // Get GPU list
-    let gpu_list = match crate::utils::gpu_detector::check_gpu_availability() {
-        Ok(list) => list,
-        Err(e) => return Err(ErrorInfo {
+    match crate::utils::app_info::set_gpu(gpu_index, &app_handle) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(ErrorInfo {
             code: ErrorCode::UnknownError,
-            message: format!("Failed to detect GPU: {}", e),
-            details: Some("Error detecting GPU capabilities".to_string()),
+            message: format!("Failed to set GPU: {}", e),
+            details: Some("Error setting GPU".to_string()),
         }),
-    };
-
-    // Validate GPU index
-    if gpu_index != -1 && (gpu_index < 0 || gpu_index as usize >= gpu_list.gpus.len()) {
-        return Err(ErrorInfo {
-            code: ErrorCode::InvalidArgument,
-            message: format!("Invalid GPU index: {}", gpu_index),
-            details: Some("GPU index out of range".to_string()),
-        });
     }
-
-    // We no longer update preferences in backend
-    // Instead, we just emit the app-info-changed event
-
-    // Emit app-info-changed event
-    let _ = app_handle.emit("app-info-changed", get_app_info(app_handle.clone())?);
-
-    Ok(())
 }
 
-/// Application information including GPU and FFmpeg version
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppInfo {
-    pub app_version: String,
-    pub ffmpeg_version: Option<String>,
-    pub gpu_available: bool,
-    pub gpus: Vec<crate::utils::gpu_detector::GpuInfo>,
-    pub selected_gpu_index: i32, // -1 for CPU, 0+ for GPU
-}
 
-// DEPRECATED: Legacy app state command - will be removed in future versions
-// Use get_app_info instead
+
+/// Emit preferences-changed event
+///
+/// This command emits the preferences-changed event with the provided preferences.
+/// It is used for backward compatibility with the old preferences system.
+///
+/// # Parameters
+/// * `preferences` - The preferences to emit
+/// * `app_handle` - Tauri AppHandle for accessing application resources
+///
+/// # Returns
+/// * `Result<(), ErrorInfo>` - Success or an error
 #[tauri::command]
-pub fn get_app_state(
-    state_manager: State<'_, StateManager>,
-) -> Result<crate::state::app_state::AppState, ErrorInfo> {
-    handle_string_as_error_info!(crate::state::get_app_state(state_manager))
+pub fn emit_preferences_changed(
+    preferences: serde_json::Value,
+    app_handle: AppHandle,
+) -> Result<(), ErrorInfo> {
+    // Emit preferences-changed event
+    let _ = app_handle.emit("preferences-changed", preferences);
+    Ok(())
 }
 
 /// Emit conversion-state-changed event
@@ -195,7 +147,7 @@ pub fn get_app_state(
 /// * `Result<(), ErrorInfo>` - Success or an error
 #[tauri::command]
 pub fn emit_conversion_state_changed(
-    conversion_state: crate::state::conversion_state::ConversionState,
+    conversion_state: serde_json::Value,
     app_handle: AppHandle,
 ) -> Result<(), ErrorInfo> {
     // Emit conversion-state-changed event
@@ -203,172 +155,7 @@ pub fn emit_conversion_state_changed(
     Ok(())
 }
 
-// DEPRECATED: Legacy conversion state command - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn get_conversion_state(
-    state_manager: State<'_, StateManager>,
-) -> Result<crate::state::conversion_state::ConversionState, ErrorInfo> {
-    handle_string_as_error_info!(crate::state::get_conversion_state(state_manager))
-}
 
-/// Emit preferences-changed event
-///
-/// This command emits the preferences-changed event with the provided preferences.
-/// It is used for backward compatibility with the old preferences system.
-///
-/// # Parameters
-/// * `preferences` - The preferences to emit
-/// * `app_handle` - Tauri AppHandle for accessing application resources
-///
-/// # Returns
-/// * `Result<(), ErrorInfo>` - Success or an error
-#[tauri::command]
-pub fn emit_preferences_changed(
-    preferences: crate::state::preferences_state::UserPreferencesState,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    // Emit preferences-changed event
-    let _ = app_handle.emit("preferences-changed", preferences);
-    Ok(())
-}
-
-// DEPRECATED: Legacy preferences command - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn get_preferences(
-    state_manager: State<'_, StateManager>,
-) -> Result<crate::state::preferences_state::UserPreferencesState, ErrorInfo> {
-    handle_string_as_error_info!(crate::state::get_preferences(state_manager))
-}
-
-// DEPRECATED: Legacy update_preferences command - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn update_preferences(
-    preferences: crate::state::preferences_state::UserPreferencesState,
-    state_manager: State<'_, StateManager>,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::update_preferences(
-        preferences,
-        state_manager,
-        app_handle
-    ))
-}
-
-#[tauri::command]
-pub fn get_global_state(
-    state_manager: State<'_, StateManager>,
-) -> Result<crate::state::GlobalState, ErrorInfo> {
-    handle_string_as_error_info!(crate::state::get_global_state(state_manager))
-}
-
-// DEPRECATED: Legacy file management commands - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn add_file_to_list(
-    id: String,
-    name: String,
-    path: String,
-    size: u64,
-    file_type: String,
-    duration: Option<f64>,
-    resolution: Option<(u32, u32)>,
-    thumbnail: Option<String>,
-    state_manager: State<'_, StateManager>,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    // Convert String -> Uuid and String -> PathBuf
-    let uuid = match crate::state::conversion_state::get_file_id_from_string(&id) {
-        Ok(uuid) => uuid,
-        Err(e) => return Err(error_handler::to_error_info(e)),
-    };
-
-    let file_info = crate::state::FileInfo {
-        id: uuid,
-        name,
-        path: std::path::PathBuf::from(path),
-        size,
-        file_type,
-        duration,
-        resolution,
-        thumbnail,
-    };
-
-    handle_command!(crate::state::add_file_to_list(
-        file_info,
-        state_manager,
-        app_handle
-    ))
-}
-
-// DEPRECATED: Legacy remove_file_from_list command - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn remove_file_from_list(
-    file_id: String,
-    state_manager: State<'_, StateManager>,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::remove_file_from_list(
-        file_id,
-        state_manager,
-        app_handle
-    ))
-}
-
-// DEPRECATED: Legacy select_file command - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn select_file(
-    file_id: Option<String>,
-    state_manager: State<'_, StateManager>,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::select_file(
-        file_id,
-        state_manager,
-        app_handle
-    ))
-}
-
-// DEPRECATED: Legacy clear_file_list command - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn clear_file_list(
-    state_manager: State<'_, StateManager>,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::clear_file_list(state_manager, app_handle))
-}
-
-// DEPRECATED: Legacy save_preferences_to_file command - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn save_preferences_to_file(app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::save_preferences_to_file(app_handle))
-}
-
-// DEPRECATED: Legacy load_preferences_from_file command - will be removed in future versions
-// Frontend should use its own state management
-#[tauri::command]
-pub fn load_preferences_from_file(app_handle: AppHandle) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::load_preferences_from_file(app_handle))
-}
-
-#[tauri::command]
-pub fn set_selected_gpu(
-    gpu_index: i32,
-    state_manager: State<'_, StateManager>,
-    app_handle: AppHandle,
-) -> Result<(), ErrorInfo> {
-    handle_string_as_error_info!(crate::state::set_selected_gpu(
-        gpu_index,
-        state_manager,
-        app_handle
-    ))
-}
 
 /// Get the path to the current log file
 ///

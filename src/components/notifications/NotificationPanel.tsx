@@ -6,7 +6,7 @@ import { Message } from 'primereact/message';
 
 import { ScrollPanel } from 'primereact/scrollpanel';
 import styled from '@emotion/styled';
-import useNotificationStore, { NotificationType } from '../../store/notification-store';
+import { useNotificationStore, NotificationType } from '../../store/notification-store';
 
 const PanelContainer = styled.div`
   display: flex;
